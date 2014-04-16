@@ -1,0 +1,51 @@
+<html>
+	<head>
+		<script src='jquery/jquery-2.1.0.min.js'></script>
+		<script src='main.js'></script>
+	</head>
+	<body>
+		<h1>PXLMXR</h1>
+		<canvas id="imagewindow" width="100" height="100" style="width:100px; height:100px; border: 1px solid black;display:block;"></canvas>
+		<label for="red">Red Value:</label>
+		<input type="text" value="" id="red"/>
+		<label for="green">Green Value:</label>
+		<input type="text" value="" id="green" />
+		<label for="blue">Blue Value:</label>
+		<input type="text" value = "" id="blue" />
+		<button id="makecolor">Fill Color</button>
+		<button id="dostuff">Do Stuff</button>
+		<input type="file" id="filebrowser"accept="image"></input>
+		<script type="text/javascript">
+			$("#makecolor").on("click", function() {
+				//var thisColor = new PXL($("#colorpicker").val()),
+				var thisColor = new PXL(Number($("#red").val()), Number($("#green").val()), Number($("#blue").val()));
+				var thatColor = new PXL(thisColor);
+				console.log(thatColor.red);
+				thisCanvas = $("#imagewindow")[0], 
+				ctx = thisCanvas.getContext("2d"),
+				imgData = ctx.createImageData(100,100);
+				for (var i=0;i<imgData.data.length;i+=4){
+					imgData.data[i] = thisColor.red;
+					imgData.data[i+1] = thisColor.green;
+					imgData.data[i+2] = thisColor.blue;
+					imgData.data[i+3] = thisColor.alpha;
+				}
+				ctx.putImageData(imgData,0,0);
+			});
+			$("#dostuff").on("click", function () {
+				var reader = new FileReader();
+				reader.onload = function (e) {
+					var image = new Image;
+					image.src = e.target.result;
+					$("#imagewindow")[0].width = image.width/2;
+					$("#imagewindow")[0].height = image.height/2;
+					$("#imagewindow")[0].getContext("2d").drawImage(image,0,0,image.width/2,image.height/2);
+					var thisPXLmap = new PXLmap($("#imagewindow")[0].getContext("2d").getImageData(0,0,100,100));
+					console.log(thisPXLmap.width+", "+$("#imagewindow")[0].getContext("2d").getImageData().width);
+				}
+				var thisFile = $("#filebrowser").prop("files")[0];
+				reader.readAsDataURL(thisFile);	
+			});
+		</script>
+	</body>
+</html>
