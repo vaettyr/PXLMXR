@@ -1,14 +1,10 @@
 //main.js
 function PXL (){
+	//This is schema is optimized for memory, but is slow on performance
+	/*
 	this.value = String.fromCharCode(0,255);
 	this.lowerBit = function(val) { return val % 256; }
 	this.upperBit = function(val) { return (val - (val % 256))/256; } 
-	this.setValue = function(val) {
-		var outValue = val;
-		if(val >= 0 && val <=1){ outValue = Math.floor(val * 255);}
-		outValue = Math.max(0,Math.min(255,Math.floor(outValue)));
-		return outValue;
-	}
 	Object.defineProperty(this,"red",{
 		get: function() {return this.upperBit(this.value.charCodeAt(0));},
 		set : function(val) {this.value = String.fromCharCode(this.lowerBit(this.value.charCodeAt(0)) + val*256,this.value.charCodeAt(1));},
@@ -34,6 +30,17 @@ function PXL (){
 		enumerable: true,
 		configurable: false
 	});
+	*/
+	this.red = 0;
+	this.green = 0;
+	this.blue = 0;
+	this.alpha = 255;
+	this.setValue = function(val) {
+		var outValue = val;
+		if(val >= 0 && val <=1){ outValue = Math.floor(val * 255);}
+		outValue = Math.max(0,Math.min(255,Math.floor(outValue)));
+		return outValue;
+	}
 	if(arguments != undefined){
 		if(typeof arguments[0] === "number" && arguments.length <= 4 ) {
 			for ( var i = 0; i < arguments.length; i++) {
@@ -54,7 +61,7 @@ function PXL (){
 				case "GREEN":
 					this.green=255;break;
 				case "BLUE":
-					this.blue=255;break;s
+					this.blue=255;break;
 				default:
 					if(arguments[0].length > 1 && arguments[0].length <=7 && arguments[0].substr(0,1)=="#"){
 						for (var i=0;i<(arguments[0].length)/3;i++){
@@ -93,5 +100,20 @@ function PXLmap (){
 				this.pxls.push(new PXL(arguments[0].data[i],arguments[0].data[i+1],arguments[0].data[i+2],arguments[0].data[i+3]));
 			}
 		}
+	}
+	this.toImageData = function(){
+		if(this.canvas == undefined){
+			this.canvas = document.createElement("canvas").getContext("2d");
+		}
+		var thisImageData = this.canvas.createImageData(this.width,this.height),
+		thisData = [];
+		for(var i = 0; i < this.pxls.length; i++){
+			thisData.push(this.pxls[i].red);
+			thisData.push(this.pxls[i].green);
+			thisData.push(this.pxls[i].blue);
+			thisData.push(this.pxls[i].alpha);
+		}
+		thisImageData.data.set(thisData);
+		return thisImageData;
 	}
 }

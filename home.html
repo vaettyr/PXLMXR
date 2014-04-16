@@ -41,7 +41,8 @@
 					$("#imagewindow")[0].height = image.height/2;
 					$("#imagewindow")[0].getContext("2d").drawImage(image,0,0,image.width/2,image.height/2);
 					var thisPXLmap = new PXLmap($("#imagewindow")[0].getContext("2d").getImageData(0,0,100,100));
-					console.log(thisPXLmap.width+", "+$("#imagewindow")[0].getContext("2d").getImageData().width);
+					console.log(thisPXLmap.width+", "+$("#imagewindow")[0].getContext("2d").getImageData(0,0,100,100).width);
+					console.log(thisPXLmap.toImageData());
 				}
 				var thisFile = $("#filebrowser").prop("files")[0];
 				reader.readAsDataURL(thisFile);	
