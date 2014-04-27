@@ -117,3 +117,77 @@ function PXLmap (){
 		return thisImageData;
 	}
 }
+
+var Application = {
+	initialize: function(elementList){
+		var app = this;
+		if(elementList == undefined) { elementList = $("[data-class]");}
+		elementList.each(function(){
+			var thisClass = $(this).attr("data-class");
+			if(thisClass != undefined && thisClass != ""){
+				$(this).data(new window[thisClass](this));
+				$(this).data().initialize();
+				app.initialize($(this).children());
+			}
+		});
+	}
+};
+//base abstract class to base all widgets on
+function widget(element) {
+	this.element = element;
+};
+widget.prototype.initialize = function(){
+	 var className = this.constructor.name;
+	 if(this.properties != undefined){
+		for(var property in this.properties){
+			className += " "+ this.properties[property];
+		}
+	 }
+	 this.element.className = className;
+};
+
+function sliderWidget (element) {
+	widget.call(this, element);
+	this.properties = {
+		orientation: "horizontal",
+		type: "hue"
+	};
+	this.indicator = "<div data-class='sliderIndicator'></div>";
+	//check the rest of our args to see if we need to set any other properties
+}
+sliderWidget.prototype = new widget();
+sliderWidget.prototype.constructor = sliderWidget;
+sliderWidget.prototype.initialize = function() {
+	//call the base initializer
+	widget.prototype.initialize.call(this);
+	//add the slider indicator
+	this.element.innerHTML = this.indicator;
+	//save a reference to the indicator
+	this.indicatorRef = this.element.childNodes[0];
+	//hook up mouse events
+	this.element.addEventListener("mousedown",this.onMouseDown);
+};
+sliderWidget.prototype.onMouseDown = function (event) {
+	//bind the other mouse events.
+	document.addEventListener("mousemove", $(this).data().onMouseMove);
+	document.addEventListener("mouseup", $(this).data().onMouseUp);
+	document.lastClicked = this;
+	var lowerLimit = this.offsetLeft, 
+	upperLimit = lowerLimit + this.offsetWidth,
+	mousePos = event.screenX,
+	sliderPos = (mousePos-lowerLimit)/upperLimit;
+};
+sliderWidget.prototype.onMouseMove = function(event){
+
+};
+sliderWidget.prototype.onMouseUp = function (event) {
+	document.removeEventListener("mousemove", $(document.lastClicked).data().onMouseMove);
+	document.removeEventListener("mouseup", $(document.lastClicked).data().onMouseUp);
+};	
+
+function sliderIndicator (element) {
+	widget.call(this, element);
+	this.properties = {	};
+};
+sliderIndicator.prototype = new widget();
+sliderIndicator.prototype.constructor = sliderIndicator;
