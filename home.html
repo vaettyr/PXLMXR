@@ -2,6 +2,28 @@
 	<head>
 		<script src='jquery/jquery-2.1.0.min.js'></script>
 		<script src='main.js'></script>
+		<script type="text/javascript">
+ 
+/***********************************************
+* Disable Text Selection script- © Dynamic Drive DHTML code library (www.dynamicdrive.com)
+* This notice MUST stay intact for legal use
+* Visit Dynamic Drive at http://www.dynamicdrive.com/ for full source code
+***********************************************/
+ 
+function disableSelection(target){
+if (typeof target.onselectstart!="undefined") //IE route
+    target.onselectstart=function(){return false}
+else if (typeof target.style.MozUserSelect!="undefined") //Firefox route
+    target.style.MozUserSelect="none"
+else //All other route (ie: Opera)
+    target.onmousedown=function(){return false}
+target.style.cursor = "default"
+}
+ 
+//Sample usages
+//disableSelection(document.body) //Disable text selection on entire body
+ 
+</script>
 		<style>
 			.hueGradientVert
 			{
@@ -71,11 +93,11 @@
 				background-color: rgb(26,26,26);
 				border-radius:0.5em;
 			}
-			.sliderWidget.horizontal
+			.sliderWidget.orientation-horizontal
 			{
 				width:100%;
 			}
-			.sliderWidget.horizontal.hue
+			.sliderWidget.orientation-horizontal.type-hue
 			{
 				background: -webkit-linear-gradient(left, red, yellow, green, cyan, blue, magenta, red);
 			}
@@ -84,8 +106,12 @@
 				position:absolute;
 				height: 2.5em;
 				width: 2.5em;
-				background-color:white;
+				background-color:rgb(75,75,75);
 				border-radius: 0.75em;
+			}
+			.sliderIndicator.orientation-horizontal
+			{
+				top: -0.25em;
 			}
 		</style>
 	</head>
@@ -143,31 +169,13 @@
 			<div class="satValGradient widgetBox"></div>
 			
 		</div>
-		<div style="position:relative;">
-			<div data-class="sliderWidget"></div>
+		<div style="position:relative;padding-right:1em;">
+			<div data-class="sliderWidget" data-properties="type:hue"></div>
 			<div data-class="sliderWidget"></div>
 			<div data-class="sliderWidget"></div>
 		</div>
 		<script type="text/javascript">
-			$(".sliderVert").on("mousedown", function(){
-				window.mouseDown = true;
-			});
-			$(".sliderVert").on("mousemove", function(event){
-				if(window.mouseDown){
-					var newHeight = (event.clientY - $(this).offset().top)/$(this).height();
-					//console.log(newHeight/$(this).height());
-					//debugger;
-					$(this).find(".sliderVertSelector").css("top", newHeight * 100 + "%");
-				}
-			});
-			$(".sliderVert").on("mouseup", function() {
-				window.mouseDown = false;
-			});
-			$(".sliderVert").on("mouseout", function() {
-				if(window.mouseDown){
-					window.mouseDown = false;
-				}
-			});
+			disableSelection(document.body) //Disable text selection on entire body
 			Application.initialize();
 		</script>
 	</body>
