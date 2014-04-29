@@ -120,21 +120,31 @@ function PXLmap (){
 
 var Application = {
 	initialize: function(elementList){
-		this.initializeClasses();
 		//get a definitive list of all css styles (classes)
-		var classes = [];
+		this.classes = [];
 		for(var styleSheet in document.styleSheets){
 			for(var rule in document.styleSheets[styleSheet].rules){
-				console.log(document.styleSheets[styleSheet].rules[rule].selectorText);
+				var thisSelector = document.styleSheets[styleSheet].rules[rule].selectorText;
+				if(thisSelector != undefined){
+					var selectors = thisSelector.split(".");
+					for(var selector in selectors){
+						if(selectors[selector] != ""){
+							if(this.classes.indexOf(selectors[selector])<0){
+								this.classes.push(selectors[selector]);
+							} 
+						}
+					}
+				}
 			}
 		}
+		this.initializeClasses();
 	},
 	initializeClasses: function(elementList){
 		var app = this;
 		if(elementList == undefined) { elementList = $("[data-class]");}
 		elementList.each(function(){
 			var thisClass = $(this).attr("data-class");
-			if(thisClass != undefined && thisClass != ""){
+			if(thisClass != undefined && thisClass != "" && window[thisClass] != undefined){
 				$(this).data(new window[thisClass](this));
 				$(this).data().initialize();
 				app.initializeClasses($(this).children());
@@ -143,6 +153,7 @@ var Application = {
 	}
 };
 //base abstract class to base all widgets on
+//TODO: add ability to spawn children from a list (with references)
 function widget(element) {
 	this.element = element;
 };
@@ -159,19 +170,29 @@ widget.prototype.initialize = function(){
 			}
 		}
 	 }
-	 //stylesheets are stored in document.styleSheets
-	 //it's an array of stylesheet objects
-	 //it contains '.rules' which is an array of CSSStyleRules
-	 //CSSStyleRules have a selectorText attribute (to compare against)
-	 if(this.properties != undefined){
+	if(this.properties != undefined){
 		for(var property in this.properties){
 			//check to see if this class (or a derivative) exists before adding it
-			
-			className += " " + property + "-" + this.properties[property];
+			if(Application.classes.indexOf(property+"-"+this.properties[property])>=0){
+				className += " " + property + "-" + this.properties[property];
+			}
 		}
 	 }
 	 this.element.className = className;
 };
+widget.prototype.getPropertiesString = function () {
+	if(this.properties != undefined){
+		var propertiesString = "";
+		for(var prop in this.properties){
+			//only add properties that are in our class list
+			if(Application.classes.indexOf(prop+"-"+this.properties[prop])>=0){
+				if(propertiesString.length > 0 ) { propertiesString += ",";}
+				propertiesString += prop +":"+this.properties[prop];
+			}
+		}
+		return propertiesString;
+	}
+}
 
 //slider Widget
 function sliderWidget (element) {
@@ -193,31 +214,29 @@ sliderWidget.prototype.initialize = function() {
 	this.element.innerHTML = this.indicator;
 	//save a reference to the indicator
 	this.indicatorRef = this.element.childNodes[0];
-	var propertiesString = "";
-	if(this.properties != undefined){
-		for(var prop in this.properties){
-			if(propertiesString.length > 0 ) { propertiesString += ",";}
-			propertiesString += prop +":"+this.properties[prop];
-		}
-	}
+	var propertiesString = this.getPropertiesString();
 	this.indicatorRef.setAttribute("data-properties",propertiesString);
-	//test to add output
-	this.element.parentNode.insertBefore(document.createElement('div'),this.element.nextSibling);
-	this.properties.output = this.element.nextSibling;
 	//hook up mouse events
 	this.element.addEventListener("mousedown",this.onMouseDown);
 };
-//add support for vertical slider
-sliderWidget.prototype.setSliderPosition = function (pageX) {
+
+sliderWidget.prototype.setSliderPosition = function (pageX, pageY) {
 	limits = this.element.getBoundingClientRect(),
 	indicator = this.indicatorRef,
 	width = indicator.offsetWidth,
-	mousePos = (pageX - limits.left) - (width/2);
-	mousePos = Math.min(Math.max(mousePos,0),this.element.offsetWidth-width);
-	indicator.style.left = mousePos;
-	this.sliderVal = mousePos/(this.element.offsetWidth-width);
+	mousePosX = (pageX - limits.left) - (width/2);	
+	mousePosX = mousePosX - document.body.scrollLeft;
+	mousePosX = Math.min(Math.max(mousePosX,0),this.element.offsetWidth-width);
+	mousePosY = (pageY - limits.top) - (width/2);
+	mousePosY = mousePosY - document.body.scrollTop;
+	mousePosY = Math.min(Math.max(mousePosY, 0), this.element.offsetHeight - width);
+	
+	if(this.properties.orientation != 'vertical'){	indicator.style.left = mousePosX;}
+	if(this.properties.orientation != 'horizontal'){ indicator.style.top = mousePosY;}
+	
+	this.sliderVal = mousePosX/(this.element.offsetWidth-width);	
 	if(this.properties.output!= undefined){
-		this.properties.output.innerHTML = (this.properties.lowerLimit * (this.sliderVal - 1)) + this.properties.upperLimit * this.sliderVal;
+		this.properties.output.innerHTML = (this.properties.lowerLimit * (1 - this.sliderVal)) + this.properties.upperLimit * this.sliderVal;
 	}
 }
 sliderWidget.prototype.onMouseDown = function (event) {
@@ -225,10 +244,10 @@ sliderWidget.prototype.onMouseDown = function (event) {
 	document.addEventListener("mousemove", $(this).data().onMouseMove);
 	document.addEventListener("mouseup", $(this).data().onMouseUp);
 	document.lastClicked = this;
-	$(this).data().setSliderPosition(event.pageX);
+	$(this).data().setSliderPosition(event.pageX, event.pageY);
 };
 sliderWidget.prototype.onMouseMove = function(event){
-	$(document.lastClicked).data().setSliderPosition(event.pageX);
+	$(document.lastClicked).data().setSliderPosition(event.pageX,event.pageY);
 };
 sliderWidget.prototype.onMouseUp = function (event) {
 	document.removeEventListener("mousemove", $(document.lastClicked).data().onMouseMove);

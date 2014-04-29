@@ -101,6 +101,15 @@ target.style.cursor = "default"
 			{
 				background: -webkit-linear-gradient(left, red, yellow, green, cyan, blue, magenta, red);
 			}
+			.sliderWidget.orientation-pane
+			{
+				height:100%;
+				width:100%;
+			}
+			.sliderWidget.orientation-vertical
+			{
+				height:100%;
+			}
 			.sliderIndicator
 			{
 				position:absolute;
@@ -112,6 +121,10 @@ target.style.cursor = "default"
 			.sliderIndicator.orientation-horizontal
 			{
 				top: -0.25em;
+			}
+			.sliderIndicator.orientation-vertical
+			{
+				left: -0.25em;
 			}
 		</style>
 	</head>
@@ -170,12 +183,12 @@ target.style.cursor = "default"
 			
 		</div>
 		<div style="position:relative;padding-right:1em;">
-			<div data-class="sliderWidget" data-properties="type:hue"></div>
-			<div data-class="sliderWidget"></div>
-			<div data-class="sliderWidget"></div>
+			<div data-class="sliderWidget" data-properties="type:hue,lowerLimit:-5,upperLimit:20"></div>
+			<div data-class="sliderWidget" data-properties="orientation:vertical"></div>
+			<div data-class="sliderWidget" data-properties="orientation:pane"></div>
 		</div>
 		<script type="text/javascript">
-			disableSelection(document.body) //Disable text selection on entire body
+			disableSelection(document.body); //Disable text selection on entire body
 			Application.initialize();
 		</script>
 	</body>
