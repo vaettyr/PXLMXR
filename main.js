@@ -302,4 +302,5 @@ sliderIndicator.prototype.constructor = sliderIndicator;
 //color picker
 function colorPickerWidget (element) {
 	widget.call(this, element);
+	console.log("test");
 }
