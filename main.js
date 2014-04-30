@@ -1,4 +1,8 @@
 //main.js
+//TODO: Move functions out of constructors. 
+//They get duplicated with each instantiation.
+//Declare them in a prototype instead.
+//This is not built on jquery, so don't use those functions
 function PXL (){
 	//This is schema is optimized for memory, but is slow on performance
 	/*
@@ -120,7 +124,6 @@ function PXLmap (){
 
 var Application = {
 	initialize: function(elementList){
-		//get a definitive list of all css styles (classes)
 		this.classes = [];
 		for(var styleSheet in document.styleSheets){
 			for(var rule in document.styleSheets[styleSheet].rules){
@@ -141,15 +144,16 @@ var Application = {
 	},
 	initializeClasses: function(elementList){
 		var app = this;
-		if(elementList == undefined) { elementList = $("[data-class]");}
-		elementList.each(function(){
-			var thisClass = $(this).attr("data-class");
+		if(elementList == undefined) { elementList = document.querySelectorAll("[data-class]");}
+		for(var i=0;i<elementList.length;i++){
+			var thisNode = elementList[i],
+			thisClass = thisNode.getAttribute("data-class");
 			if(thisClass != undefined && thisClass != "" && window[thisClass] != undefined){
-				$(this).data(new window[thisClass](this));
-				$(this).data().initialize();
-				app.initializeClasses($(this).children());
+				thisNode.data = new window[thisClass](thisNode);
+				thisNode.data.initialize();
+				app.initializeClasses(thisNode.children);
 			}
-		});
+		}
 	}
 };
 //base abstract class to base all widgets on
@@ -170,6 +174,7 @@ widget.prototype.initialize = function(){
 			}
 		}
 	 }
+	 //set classes
 	if(this.properties != undefined){
 		for(var property in this.properties){
 			//check to see if this class (or a derivative) exists before adding it
@@ -179,6 +184,37 @@ widget.prototype.initialize = function(){
 		}
 	 }
 	 this.element.className = className;
+	 //spawn members
+	 if(this.members != undefined){
+		//members should be an array of objects
+		//each object has className and properties
+		var html = "";
+		for(var i=0;i<this.members.length;i++){
+			var thisMember = this.members[i];
+			html += "<div data-class='"+thisMember.className+"'";
+			if(thisMember.properties != undefined || this.properties != undefined){
+				//build a master list of properties, including overridden properties
+				var theseProperties = (this.properties == undefined)?{}:this.properties;
+				for(var key in thisMember.properties){
+					theseProperties[key] = thisMember.properties[key];
+				}
+				debugger;
+				html += " data-properties='";
+				var htmlProperties = "";	
+				for(var key in theseProperties){
+					if (htmlProperties.length > 0){htmlProperties +=",";}
+					htmlProperties += key + ":" + theseProperties[key];
+				}
+				htmlProperties += "'";
+			}
+			html += "></div>";
+		}
+		this.element.innerHTML = html;
+		//save references to each
+		for(var i=0;i<this.members.length;i++){
+			this[this.members[i].name] = this.element.children[i];
+		}
+	 }
 };
 widget.prototype.getPropertiesString = function () {
 	if(this.properties != undefined){
@@ -202,7 +238,8 @@ function sliderWidget (element) {
 		lowerLimit:0,
 		upperLimit:1
 	};
-	this.indicator = "<div data-class='sliderIndicator'></div>";
+	//this.indicator = "<div data-class='sliderIndicator'></div>";
+	this.members = [{className:"sliderIndicator", name:"indicatorRef"}];
 	//check the rest of our args to see if we need to set any other properties
 }
 sliderWidget.prototype = new widget();
@@ -211,11 +248,11 @@ sliderWidget.prototype.initialize = function() {
 	//call the base initializer
 	widget.prototype.initialize.call(this);
 	//add the slider indicator
-	this.element.innerHTML = this.indicator;
+	//this.element.innerHTML = this.indicator;
 	//save a reference to the indicator
-	this.indicatorRef = this.element.childNodes[0];
-	var propertiesString = this.getPropertiesString();
-	this.indicatorRef.setAttribute("data-properties",propertiesString);
+	//this.indicatorRef = this.element.childNodes[0];
+	//var propertiesString = this.getPropertiesString();
+	//this.indicatorRef.setAttribute("data-properties",propertiesString);
 	//hook up mouse events
 	this.element.addEventListener("mousedown",this.onMouseDown);
 };
@@ -241,17 +278,17 @@ sliderWidget.prototype.setSliderPosition = function (pageX, pageY) {
 }
 sliderWidget.prototype.onMouseDown = function (event) {
 	//bind the other mouse events.
-	document.addEventListener("mousemove", $(this).data().onMouseMove);
-	document.addEventListener("mouseup", $(this).data().onMouseUp);
+	document.addEventListener("mousemove", this.data.onMouseMove);
+	document.addEventListener("mouseup", this.data.onMouseUp);
 	document.lastClicked = this;
-	$(this).data().setSliderPosition(event.pageX, event.pageY);
+	this.data.setSliderPosition(event.pageX, event.pageY);
 };
 sliderWidget.prototype.onMouseMove = function(event){
-	$(document.lastClicked).data().setSliderPosition(event.pageX,event.pageY);
+	document.lastClicked.data.setSliderPosition(event.pageX,event.pageY);
 };
 sliderWidget.prototype.onMouseUp = function (event) {
-	document.removeEventListener("mousemove", $(document.lastClicked).data().onMouseMove);
-	document.removeEventListener("mouseup", $(document.lastClicked).data().onMouseUp);
+	document.removeEventListener("mousemove", document.lastClicked.data.onMouseMove);
+	document.removeEventListener("mouseup", document.lastClicked.data.onMouseUp);
 };	
 
 //slider indicator
@@ -261,3 +298,8 @@ function sliderIndicator (element) {
 };
 sliderIndicator.prototype = new widget();
 sliderIndicator.prototype.constructor = sliderIndicator;
+
+//color picker
+function colorPickerWidget (element) {
+	widget.call(this, element);
+}
