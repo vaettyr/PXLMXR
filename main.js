@@ -198,7 +198,6 @@ widget.prototype.initialize = function(){
 				for(var key in thisMember.properties){
 					theseProperties[key] = thisMember.properties[key];
 				}
-				debugger;
 				html += " data-properties='";
 				var htmlProperties = "";	
 				for(var key in theseProperties){
@@ -206,6 +205,7 @@ widget.prototype.initialize = function(){
 					htmlProperties += key + ":" + theseProperties[key];
 				}
 				htmlProperties += "'";
+				html += htmlProperties;
 			}
 			html += "></div>";
 		}
