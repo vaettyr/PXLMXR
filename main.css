@@ -1,0 +1,65 @@
+*
+{
+	padding : 0;
+	margin : 0;
+}
+
+body
+{
+	background : white;
+	color : black;
+	font-size : 16px;
+}
+
+/*this should always be overriden*/
+/*this should always be overriden*/
+.sliderWidget
+{
+	position : relative;
+	display : inline-block;
+	margin : 0.5em;
+	height : 2em;
+	width : 2em;
+	background-color : rgb(26,26,26);
+	border-radius : 0.5em;
+}
+
+.sliderWidget.orientation-horizontal
+{
+	width : 100%;
+}
+
+.sliderWidget.orientation-horizontal.type-hue
+{
+	background : -webkit-linear-gradient(left, red, yellow, green, cyan, blue, magenta, red);
+}
+
+.sliderWidget.orientation-pane
+{
+	height : 100%;
+	width : 100%;
+}
+
+.sliderWidget.orientation-vertical
+{
+	height : 100%;
+}
+
+.sliderIndicator
+{
+	position : absolute;
+	height : 2.5em;
+	width : 2.5em;
+	background-color : rgb(75,75,75);
+	border-radius : 0.75em;
+}
+
+.sliderIndicator.orientation-horizontal
+{
+	top : -0.25em;
+}
+
+.sliderIndicator.orientation-vertical
+{
+	left : -0.25em;
+}

@@ -1,22 +1,24 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html>
 	<head>
 		<!--<script src='jquery/jquery-2.1.0.min.js'></script>-->
-		<script src='main.js'></script>
-		<script type="text/javascript">
+<script type="text/javascript" src='main.js'>
+</script>
+<script type="text/javascript">
  
 /***********************************************
-* Disable Text Selection script- © Dynamic Drive DHTML code library (www.dynamicdrive.com)
+* Disable Text Selection script- ?? Dynamic Drive DHTML code library (www.dynamicdrive.com)
 * This notice MUST stay intact for legal use
 * Visit Dynamic Drive at http://www.dynamicdrive.com/ for full source code
 ***********************************************/
  
 function disableSelection(target){
 if (typeof target.onselectstart!="undefined") //IE route
-    target.onselectstart=function(){return false}
+	target.onselectstart=function(){return false}
 else if (typeof target.style.MozUserSelect!="undefined") //Firefox route
-    target.style.MozUserSelect="none"
+	target.style.MozUserSelect="none"
 else //All other route (ie: Opera)
-    target.onmousedown=function(){return false}
+	target.onmousedown=function(){return false}
 target.style.cursor = "default"
 }
  
@@ -24,172 +26,20 @@ target.style.cursor = "default"
 //disableSelection(document.body) //Disable text selection on entire body
  
 </script>
-		<style>
-			.hueGradientVert
-			{
-				background: -webkit-linear-gradient(red, yellow, green, cyan, blue, magenta, red);
-			}
-			.sliderVert
-			{
-				/*display: inline-block;*/
-				position:absolute;
-				right:0;
-				height: 90%;
-				width: 1.5em;
-				box-sizing: border-box;
-				border-radius: 3px;
-				margin: 1em;
-				/*box-shadow: 0px 0px 1px 2px #222222 inset;*/
-			}
-			.sliderVertSelector
-			{
-				height:.75em;
-				width: 1.5em;
-				border-radius:3px;
-				background:white;
-				/*box-shadow: 0px 0px 2px 2px black inset;*/
-				/*position:relative;*/
-				position: absolute;
-			}
-			.widgetBox
-			{
-				position:absolute;
-				width: 60%;
-				height: 60%;
-				border: 1px solid black;
-				border-radius: 5px;
-				background: #222222;
-				/*box-shadow: 0px 0px 1px 3px #111111 inset;*/
-			}
-			.satValGradient
-			{
-				display:inline-block;
-				height:20em;
-				width:20em;
-				background: -webkit-linear-gradient(left, white, red);
-				margin: 1em;
-			}
-			.satValGradient:after
-			{
-				display:inline-block;
-				height:100%;
-				width:100%;
-				background:-webkit-linear-gradient(rgba(0,0,0,0),rgba(0,0,0,1));
-				content:" ";
-			}
-		</style>
-		<style>
-			body
-			{
-				font-size:16px;
-			}
-			.sliderWidget
-			{
-				position:relative;
-				display:inline-block;
-				margin: 0.5em;
-				height:2em;		/*this should always be overriden*/
-				width:2em;		/*this should always be overriden*/
-				background-color: rgb(26,26,26);
-				border-radius:0.5em;
-			}
-			.sliderWidget.orientation-horizontal
-			{
-				width:100%;
-			}
-			.sliderWidget.orientation-horizontal.type-hue
-			{
-				background: -webkit-linear-gradient(left, red, yellow, green, cyan, blue, magenta, red);
-			}
-			.sliderWidget.orientation-pane
-			{
-				height:100%;
-				width:100%;
-			}
-			.sliderWidget.orientation-vertical
-			{
-				height:100%;
-			}
-			.sliderIndicator
-			{
-				position:absolute;
-				height: 2.5em;
-				width: 2.5em;
-				background-color:rgb(75,75,75);
-				border-radius: 0.75em;
-			}
-			.sliderIndicator.orientation-horizontal
-			{
-				top: -0.25em;
-			}
-			.sliderIndicator.orientation-vertical
-			{
-				left: -0.25em;
-			}
-		</style>
+<style type="text/css" src='main.css'>
+</style>
+		<title>
+		</title>
 	</head>
 	<body>
-		<h1>PXLMXR</h1>
-		<!--
-		<canvas id="imagewindow" width="100" height="100" style="width:100px; height:100px; border: 1px solid black;display:block;"></canvas>
-		<label for="red">Red Value:</label>
-		<input type="text" value="" id="red"/>
-		<label for="green">Green Value:</label>
-		<input type="text" value="" id="green" />
-		<label for="blue">Blue Value:</label>
-		<input type="text" value = "" id="blue" />
-		<button id="makecolor">Fill Color</button>
-		<button id="dostuff">Do Stuff</button>
-		<input type="file" id="filebrowser"accept="image"></input>
-		<script type="text/javascript">
-			$("#makecolor").on("click", function() {
-				//var thisColor = new PXL($("#colorpicker").val()),
-				var thisColor = new PXL(Number($("#red").val()), Number($("#green").val()), Number($("#blue").val()));
-				var thatColor = new PXL(thisColor);
-				console.log(thatColor.red);
-				thisCanvas = $("#imagewindow")[0], 
-				ctx = thisCanvas.getContext("2d"),
-				imgData = ctx.createImageData(100,100);
-				for (var i=0;i<imgData.data.length;i+=4){
-					imgData.data[i] = thisColor.red;
-					imgData.data[i+1] = thisColor.green;
-					imgData.data[i+2] = thisColor.blue;
-					imgData.data[i+3] = thisColor.alpha;
-				}
-				ctx.putImageData(imgData,0,0);
-			});
-			$("#dostuff").on("click", function () {
-				var reader = new FileReader();
-				reader.onload = function (e) {
-					var image = new Image;
-					image.src = e.target.result;
-					$("#imagewindow")[0].width = image.width/2;
-					$("#imagewindow")[0].height = image.height/2;
-					$("#imagewindow")[0].getContext("2d").drawImage(image,0,0,image.width/2,image.height/2);
-					var thisPXLmap = new PXLmap($("#imagewindow")[0].getContext("2d").getImageData(0,0,100,100));
-					console.log(thisPXLmap.width+", "+$("#imagewindow")[0].getContext("2d").getImageData(0,0,100,100).width);
-					console.log(thisPXLmap.toImageData());
-				}
-				var thisFile = $("#filebrowser").prop("files")[0];
-				reader.readAsDataURL(thisFile);	
-			});
-		</script>
-		-->
-		<div id="colorPicker" class="widgetBox">
-			<div id="hueSlider" class="hueGradientVert sliderVert">
-				<div class="sliderVertSelector"></div>
-			</div>
-			<div class="satValGradient widgetBox"></div>
-			
-		</div>
-		<div style="position:relative;padding-right:1em;">
-			<div data-class="sliderWidget" data-properties="type:hue,lowerLimit:-5,upperLimit:20"></div>
-			<div data-class="sliderWidget" data-properties="orientation:vertical"></div>
-			<div data-class="sliderWidget" data-properties="orientation:pane"></div>
-		</div>
-		<script type="text/javascript">
-			disableSelection(document.body); //Disable text selection on entire body
-			Application.initialize();
-		</script>
+		<h1>
+			PXLMXR
+		</h1>						
+		<div id="colorPicker" class=
+		"widgetBox hueGradientVert sliderVert">
+</div><script type="text/javascript">
+						disableSelection(document.body); //Disable text selection on entire body
+						Application.initialize();
+				</script>
 	</body>
 </html>

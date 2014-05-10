@@ -241,6 +241,12 @@ function sliderWidget (element) {
 	//this.indicator = "<div data-class='sliderIndicator'></div>";
 	this.members = [{className:"sliderIndicator", name:"indicatorRef"}];
 	//check the rest of our args to see if we need to set any other properties
+    Object.defineProperty(this,"value",{
+     get: function() {return this.upperBit(this.value.ch;},
+		set : function(val) {this.value = String.fromCharCode(this.lowerBit(this.value.charCodeAt(0)) + val*256,this.value.charCodeAt(1));},
+		enumerable: true,
+		configurable: false 
+    });
 }
 sliderWidget.prototype = new widget();
 sliderWidget.prototype.constructor = sliderWidget;
@@ -302,5 +308,19 @@ sliderIndicator.prototype.constructor = sliderIndicator;
 //color picker
 function colorPickerWidget (element) {
 	widget.call(this, element);
-	console.log("test");
+	//console.log("test");
+	this.members = [
+	    { className:"sliderWidget", name:"satValPane", 
+	        properties:{orientation:"pane",type:"sat-val"},
+	    { className:"sliderWidget", name:"hueSlider", 
+	        properties:{orientation:"vertical",type:"hue" },
+	    { className:"sliderWidget", name:"redSlider", 
+	        properties:{orientation:"horizontal",type:"red" },
+	    { className:"sliderWidget", name:"greenSlider", 
+	        properties:{orientation:"horizontal",type:"green" },
+	    { className:"sliderWidget", name:"blueSlider", 
+	        properties:{orientation:"horizontal",type:"blue" }
+	    ];
 }
+colorPickerWidget.prototype = new widget();
+colorPickerWidget.prototype.constructor = colorPickerWidget;
