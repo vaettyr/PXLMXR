@@ -39,12 +39,6 @@ function PXL (){
 	this.green = 0;
 	this.blue = 0;
 	this.alpha = 255;
-	this.setValue = function(val) {
-		var outValue = val;
-		if(val >= 0 && val <=1){ outValue = Math.floor(val * 255);}
-		outValue = Math.max(0,Math.min(255,Math.floor(outValue)));
-		return outValue;
-	}
 	if(arguments != undefined){
 		if(typeof arguments[0] === "number" && arguments.length <= 4 ) {
 			for ( var i = 0; i < arguments.length; i++) {
@@ -77,6 +71,12 @@ function PXL (){
 			}
 		}
 	}
+}
+PXL.prototype.setValue = function(val) {
+	var outValue = val;
+	if(val >= 0 && val <=1){ outValue = Math.floor(val * 255);}
+	outValue = Math.max(0,Math.min(255,Math.floor(outValue)));
+	return outValue;
 }
 
 function PXLmap (){
@@ -149,7 +149,15 @@ var Application = {
 			var thisNode = elementList[i],
 			thisClass = thisNode.getAttribute("data-class");
 			if(thisClass != undefined && thisClass != "" && window[thisClass] != undefined){
-				thisNode.data = new window[thisClass](thisNode);
+				var newClassObject = new window[thisClass](thisNode);
+				if(thisNode.data == undefined) {
+					thisNode.data = newClassObject;
+				} else {
+					for(key in newClassObject){
+						thisNode.data[key] = newClassObject[key];
+					}
+				}
+				//thisNode.data = new window[thisClass](thisNode);
 				thisNode.data.initialize();
 				app.initializeClasses(thisNode.children);
 			}
@@ -230,6 +238,24 @@ widget.prototype.getPropertiesString = function () {
 	}
 }
 
+//input/output widget
+function ioWidget (element) {
+	widget.call(this, element);
+	this.properties = { type: "number" };
+}
+ioWidget.prototype = new widget();
+ioWidget.prototype.constructor = ioWidget;
+ioWidget.prototype.initialize = function () {
+	widget.prototype.initialize.call(this);
+	//add our input
+	this.element.innerHTML = "<input type='"+this.properties.type+"' />";
+	this.input = this.element.children[0];
+	if(this.properties.width != undefined){
+		this.input.style.width = this.properties.width + "em";
+	}
+}
+
+//TODO: Add input/output to base slider widget
 //slider Widget
 function sliderWidget (element) {
 	widget.call(this, element);
@@ -241,7 +267,16 @@ function sliderWidget (element) {
 	//this.indicator = "<div data-class='sliderIndicator'></div>";
 	this.members = [{className:"sliderIndicator", name:"indicatorRef"}];
 	//check the rest of our args to see if we need to set any other properties
-    Object.defineProperty(this,"value",{
+    
+}
+sliderWidget.prototype = new widget();
+sliderWidget.prototype.constructor = sliderWidget;
+sliderWidget.prototype.initialize = function() {
+	//call the base initializer
+	widget.prototype.initialize.call(this);
+	//hook up mouse events
+	this.element.addEventListener("mousedown",this.onMouseDown);
+	Object.defineProperty(this,"value",{
 		get: function() {
 			switch(this.properties.orientation){
 				case "horizontal":
@@ -272,38 +307,36 @@ function sliderWidget (element) {
 		enumerable: true,
 		configurable: false 
     });
-}
-sliderWidget.prototype = new widget();
-sliderWidget.prototype.constructor = sliderWidget;
-sliderWidget.prototype.initialize = function() {
-	//call the base initializer
-	widget.prototype.initialize.call(this);
-	//hook up mouse events
-	this.element.addEventListener("mousedown",this.onMouseDown);
 };
 sliderWidget.prototype.getHorizontal = function() {
-	var x = this.indicatorRef.style.left;
+	if(this.indicatorRef == undefined){return;}
+	var x = this.indicatorRef.style.left; 
+	x = x.slice(0,x.length-2); //remove 'px' and cast to number
 	x = x / (this.element.offsetWidth - this.indicatorRef.offsetWidth);
 	x = (this.properties.lowerLimit * (1 - x)) + (this.properties.upperLimit * x);
 	return x;
 }
 sliderWidget.prototype.setHorizontal = function(val) {
+	if(this.indicatorRef == undefined){return;}
 	var x = Math.max(Math.min(this.properties.upperLimit, val),this.properties.lowerLimit);
 	x = (x - this.properties.lowerLimit)/this.proerties.upperLimit;
 	x = x * (this.element.offsetWidth - this.indicatorRef.offsetWidth);
-	this.indicatorRef.style.left = x;
+	this.indicatorRef.style.left = x + "px";
 }
 sliderWidget.prototype.getVertical = function() {
+	if(this.indicatorRef == undefined){return;}
 	var y = this.indicatorRef.style.top;
+	y = y.slice(0,y.length-2); //remove 'px' and cast to number
 	y = y / (this.element.offsetHeight - this.indicatorRef.offsetHeight);
 	y = (this.properties.lowerLimit * (1 - y)) + (this.properties.upperLimit * y);
 	return y;
 }
 sliderWidget.prototype.setVertical = function(val) {
+	if(this.indicatorRef == undefined){return;}
 	var y = Math.max(Math.min(this.properties.upperLimit, val),this.properties.lowerLimit);
 	y = (y - this.properties.lowerLimit)/this.proerties.upperLimit;
 	y = y * (this.element.offsetHeight - this.indicatorRef.offsetHeight);
-	this.indicatorRef.style.top = y;
+	this.indicatorRef.style.top = y + "px";
 }
 sliderWidget.prototype.setSliderPosition = function (pageX, pageY) {
 	var limits = this.element.getBoundingClientRect(),
@@ -319,7 +352,6 @@ sliderWidget.prototype.setSliderPosition = function (pageX, pageY) {
 	if(this.properties.orientation != 'vertical'){	indicator.style.left = mousePosX + "px";}
 	if(this.properties.orientation != 'horizontal'){ indicator.style.top = mousePosY + "px";}
 	//execute any callback events
-	debugger;
 	if(this.onUpdate != undefined){this.onUpdate(this);}
 }
 sliderWidget.prototype.onMouseDown = function (event) {
@@ -350,11 +382,11 @@ function rgbWidget (element) {
 	widget.call(this, element);
 	this.members = [
 		{ className:"sliderWidget", name:"red", 
-	        properties:{orientation:"horizontal",type:"red" }},
+	        properties:{orientation:"horizontal",type:"red" , upperLimit:255 }},
 	    { className:"sliderWidget", name:"green", 
-	        properties:{orientation:"horizontal",type:"green" }},
+	        properties:{orientation:"horizontal",type:"green" , upperLimit:255 }},
 	    { className:"sliderWidget", name:"blue", 
-	        properties:{orientation:"horizontal",type:"blue" }}
+	        properties:{orientation:"horizontal",type:"blue" , upperLimit:255 }}
 	];
 	this.color = new PXL();
 }
@@ -362,15 +394,33 @@ rgbWidget.prototype = new widget();
 rgbWidget.prototype.constructor = rgbWidget;
 rgbWidget.prototype.initialize = function() {
 	widget.prototype.initialize.call(this);
-	debugger;
-	this.red.data.onUpdate = this.setColor;
-	this.green.data.onUpdate = this.setColor;
-	this.blue.data.onUpdate = this.setColor;
+	var parent = this,
+	parentSetColor = function(){parent.setColor.call(parent);};
+	this.red.data = {onUpdate : parentSetColor};
+	this.green.data = {onUpdate : parentSetColor};
+	this.blue.data = {onUpdate : parentSetColor};
 }
 rgbWidget.prototype.setColor = function() {
-	this.color.setValue(this.red.value, this.green.value, this.blue.value);
-	console.log(this.color);
+	this.color.red = this.color.setValue(this.red.data.value);
+	this.color.green = this.color.setValue(this.green.data.value);
+	this.color.blue = this.color.setValue(this.blue.data.value);
 }
+rgbWidget.prototype.setValues = function(){
+	//drive the sliders from external inputs
+}
+
+//rgb display widget
+function rgbDisplay (element) {
+	widget.call(this, element);
+	this.members = [
+		{ className:"ioWidget", name:"red", properties:{width:2}},
+		{ className:"ioWidget", name:"green", properties:{width:2}},
+		{ className:"ioWidget", name:"blue", properties:{width:2}}
+	];
+	this.color = new PXL();
+}
+rgbDisplay.prototype = new widget();
+rgbDisplay.prototype.constructor = rgbDisplay;
 
 //color picker
 function colorPickerWidget (element) {

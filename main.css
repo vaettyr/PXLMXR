@@ -11,6 +11,13 @@ body
 	font-size : 16px;
 }
 
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button
+{
+	-webkit-appearance: none;
+	margin:0;
+}
+
 /*this should always be overriden*/
 /*this should always be overriden*/
 .sliderWidget
@@ -26,6 +33,7 @@ body
 .sliderWidget.orientation-horizontal
 {
 	width : 100%;
+	margin: 0.2em 0em;
 }
 
 .sliderWidget.orientation-horizontal.type-hue
@@ -73,4 +81,18 @@ body
 .sliderIndicator.orientation-vertical
 {
 	left : -0.25em;
+}
+
+.ioWidget
+{
+	margin: 0.2em 0em;
+}
+.ioWidget > input, .ioWidget > input:focus
+{
+	height: 2em;
+	padding: 0em 1em;
+	border-radius: 0.5em;
+	border: 1px solid black;
+	outline-width:0;
+	box-sizing: content-box;
 }
