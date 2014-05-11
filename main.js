@@ -156,8 +156,8 @@ var Application = {
 		}
 	}
 };
+
 //base abstract class to base all widgets on
-//TODO: add ability to spawn children from a list (with references)
 function widget(element) {
 	this.element = element;
 };
@@ -242,8 +242,33 @@ function sliderWidget (element) {
 	this.members = [{className:"sliderIndicator", name:"indicatorRef"}];
 	//check the rest of our args to see if we need to set any other properties
     Object.defineProperty(this,"value",{
-     get: function() {return this.upperBit(this.value.ch;},
-		set : function(val) {this.value = String.fromCharCode(this.lowerBit(this.value.charCodeAt(0)) + val*256,this.value.charCodeAt(1));},
+		get: function() {
+			switch(this.properties.orientation){
+				case "horizontal":
+					return this.getHorizontal();
+					break;
+				case "vertical":
+					return this.getVertical();
+					break;
+				default:
+					return {x:this.getHorizontal(), y:this.getVertical()};
+					break;
+			}
+		},
+		set : function() {
+			switch(this.properties.orientation){
+				case "horizontal":
+					this.setHorizontal(arguments[0]);
+					break;
+				case "vertical":
+					this.setVertical(arguments[0]);
+					break;
+				default:
+					this.setHorizontal(arguments[0]);
+					this.setVertical(arguments[1]);
+					break;
+			}
+		},
 		enumerable: true,
 		configurable: false 
     });
@@ -253,34 +278,49 @@ sliderWidget.prototype.constructor = sliderWidget;
 sliderWidget.prototype.initialize = function() {
 	//call the base initializer
 	widget.prototype.initialize.call(this);
-	//add the slider indicator
-	//this.element.innerHTML = this.indicator;
-	//save a reference to the indicator
-	//this.indicatorRef = this.element.childNodes[0];
-	//var propertiesString = this.getPropertiesString();
-	//this.indicatorRef.setAttribute("data-properties",propertiesString);
 	//hook up mouse events
 	this.element.addEventListener("mousedown",this.onMouseDown);
 };
-
+sliderWidget.prototype.getHorizontal = function() {
+	var x = this.indicatorRef.style.left;
+	x = x / (this.element.offsetWidth - this.indicatorRef.offsetWidth);
+	x = (this.properties.lowerLimit * (1 - x)) + (this.properties.upperLimit * x);
+	return x;
+}
+sliderWidget.prototype.setHorizontal = function(val) {
+	var x = Math.max(Math.min(this.properties.upperLimit, val),this.properties.lowerLimit);
+	x = (x - this.properties.lowerLimit)/this.proerties.upperLimit;
+	x = x * (this.element.offsetWidth - this.indicatorRef.offsetWidth);
+	this.indicatorRef.style.left = x;
+}
+sliderWidget.prototype.getVertical = function() {
+	var y = this.indicatorRef.style.top;
+	y = y / (this.element.offsetHeight - this.indicatorRef.offsetHeight);
+	y = (this.properties.lowerLimit * (1 - y)) + (this.properties.upperLimit * y);
+	return y;
+}
+sliderWidget.prototype.setVertical = function(val) {
+	var y = Math.max(Math.min(this.properties.upperLimit, val),this.properties.lowerLimit);
+	y = (y - this.properties.lowerLimit)/this.proerties.upperLimit;
+	y = y * (this.element.offsetHeight - this.indicatorRef.offsetHeight);
+	this.indicatorRef.style.top = y;
+}
 sliderWidget.prototype.setSliderPosition = function (pageX, pageY) {
-	limits = this.element.getBoundingClientRect(),
+	var limits = this.element.getBoundingClientRect(),
 	indicator = this.indicatorRef,
 	width = indicator.offsetWidth,
-	mousePosX = (pageX - limits.left) - (width/2);	
+	mousePosX = (pageX - limits.left) - (width/2),
+	mousePosY = (pageY - limits.top) - (width/2);	
 	mousePosX = mousePosX - document.body.scrollLeft;
 	mousePosX = Math.min(Math.max(mousePosX,0),this.element.offsetWidth-width);
-	mousePosY = (pageY - limits.top) - (width/2);
 	mousePosY = mousePosY - document.body.scrollTop;
 	mousePosY = Math.min(Math.max(mousePosY, 0), this.element.offsetHeight - width);
 	
-	if(this.properties.orientation != 'vertical'){	indicator.style.left = mousePosX;}
-	if(this.properties.orientation != 'horizontal'){ indicator.style.top = mousePosY;}
-	
-	this.sliderVal = mousePosX/(this.element.offsetWidth-width);	
-	if(this.properties.output!= undefined){
-		this.properties.output.innerHTML = (this.properties.lowerLimit * (1 - this.sliderVal)) + this.properties.upperLimit * this.sliderVal;
-	}
+	if(this.properties.orientation != 'vertical'){	indicator.style.left = mousePosX + "px";}
+	if(this.properties.orientation != 'horizontal'){ indicator.style.top = mousePosY + "px";}
+	//execute any callback events
+	debugger;
+	if(this.onUpdate != undefined){this.onUpdate(this);}
 }
 sliderWidget.prototype.onMouseDown = function (event) {
 	//bind the other mouse events.
@@ -305,21 +345,41 @@ function sliderIndicator (element) {
 sliderIndicator.prototype = new widget();
 sliderIndicator.prototype.constructor = sliderIndicator;
 
+//rgb widget
+function rgbWidget (element) {
+	widget.call(this, element);
+	this.members = [
+		{ className:"sliderWidget", name:"red", 
+	        properties:{orientation:"horizontal",type:"red" }},
+	    { className:"sliderWidget", name:"green", 
+	        properties:{orientation:"horizontal",type:"green" }},
+	    { className:"sliderWidget", name:"blue", 
+	        properties:{orientation:"horizontal",type:"blue" }}
+	];
+	this.color = new PXL();
+}
+rgbWidget.prototype = new widget();
+rgbWidget.prototype.constructor = rgbWidget;
+rgbWidget.prototype.initialize = function() {
+	widget.prototype.initialize.call(this);
+	debugger;
+	this.red.data.onUpdate = this.setColor;
+	this.green.data.onUpdate = this.setColor;
+	this.blue.data.onUpdate = this.setColor;
+}
+rgbWidget.prototype.setColor = function() {
+	this.color.setValue(this.red.value, this.green.value, this.blue.value);
+	console.log(this.color);
+}
+
 //color picker
 function colorPickerWidget (element) {
 	widget.call(this, element);
-	//console.log("test");
 	this.members = [
 	    { className:"sliderWidget", name:"satValPane", 
-	        properties:{orientation:"pane",type:"sat-val"},
+	        properties:{orientation:"pane",type:"sat-val"}},
 	    { className:"sliderWidget", name:"hueSlider", 
-	        properties:{orientation:"vertical",type:"hue" },
-	    { className:"sliderWidget", name:"redSlider", 
-	        properties:{orientation:"horizontal",type:"red" },
-	    { className:"sliderWidget", name:"greenSlider", 
-	        properties:{orientation:"horizontal",type:"green" },
-	    { className:"sliderWidget", name:"blueSlider", 
-	        properties:{orientation:"horizontal",type:"blue" }
+	        properties:{orientation:"vertical",type:"hue" }}
 	    ];
 }
 colorPickerWidget.prototype = new widget();
