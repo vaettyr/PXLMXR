@@ -264,15 +264,11 @@ function sliderWidget (element) {
 		lowerLimit:0,
 		upperLimit:1
 	};
-	//this.indicator = "<div data-class='sliderIndicator'></div>";
 	this.members = [{className:"sliderIndicator", name:"indicatorRef"}];
-	//check the rest of our args to see if we need to set any other properties
-    
 }
 sliderWidget.prototype = new widget();
 sliderWidget.prototype.constructor = sliderWidget;
 sliderWidget.prototype.initialize = function() {
-	//call the base initializer
 	widget.prototype.initialize.call(this);
 	//hook up mouse events
 	this.element.addEventListener("mousedown",this.onMouseDown);
