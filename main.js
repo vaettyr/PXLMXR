@@ -270,6 +270,10 @@ sliderWidget.prototype = new widget();
 sliderWidget.prototype.constructor = sliderWidget;
 sliderWidget.prototype.initialize = function() {
 	widget.prototype.initialize.call(this);
+	//add the ioWidget
+	//can only initialize children, not next-of-kin
+	this.element.insertAdjacentHTML("afterend","<div data-class='ioWidget' data-properties='width:2'></div>");
+	this.output = this.element.nextSibling;
 	//hook up mouse events
 	this.element.addEventListener("mousedown",this.onMouseDown);
 	Object.defineProperty(this,"value",{
