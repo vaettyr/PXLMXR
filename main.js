@@ -122,6 +122,7 @@ function PXLmap (){
 	}
 }
 
+//TODO: add support for compound selectors (csv)
 var Application = {
 	initialize: function(elementList){
 		this.classes = [];
@@ -160,6 +161,7 @@ var Application = {
 				//thisNode.data = new window[thisClass](thisNode);
 				thisNode.data.initialize();
 				app.initializeClasses(thisNode.children);
+				thisNode.data.postInitialize();
 			}
 		}
 	}
@@ -177,8 +179,8 @@ widget.prototype.initialize = function(){
 		var pairs = htmlProperties.split(",");
 		for( var i=0; i < pairs.length; i++ ){
 			var keyValue = pairs[i].split(":");
-			if(keyValue.length == 2 && keyValue[0]!="" && keyValue[1] != ""){
-				this.properties[keyValue[0]] = keyValue[1];
+			if(keyValue.length == 2 && keyValue[0].trim()!="" && keyValue[1].trim() != ""){
+				this.properties[keyValue[0].trim()] = keyValue[1].trim();
 			}
 		}
 	 }
@@ -224,6 +226,9 @@ widget.prototype.initialize = function(){
 		}
 	 }
 };
+widget.prototype.postInitialize = function(){
+	//placeholder function that is called when all of a widget's members have been initialized
+}
 widget.prototype.getPropertiesString = function () {
 	if(this.properties != undefined){
 		var propertiesString = "";
@@ -241,21 +246,37 @@ widget.prototype.getPropertiesString = function () {
 //input/output widget
 function ioWidget (element) {
 	widget.call(this, element);
-	this.properties = { type: "number" };
+	this.properties = { type: "number" , size: "3"};
 }
 ioWidget.prototype = new widget();
 ioWidget.prototype.constructor = ioWidget;
 ioWidget.prototype.initialize = function () {
 	widget.prototype.initialize.call(this);
 	//add our input
-	this.element.innerHTML = "<input type='"+this.properties.type+"' />";
+	this.element.innerHTML = "<input type='"+this.properties.type+"' size='"+this.properties.size+"' style='width:"+this.properties.size+"em;'/>";
 	this.input = this.element.children[0];
 	if(this.properties.width != undefined){
 		this.input.style.width = this.properties.width + "em";
 	}
+	//hook up onUpdate default handler
+	this.input.onchange = this.onChange;
+	//set virtual 'value' property
+	Object.defineProperty(this, "value", {
+		get: function () {
+			return this.input.value;
+		},
+		set: function (val) {
+			this.input.value = val;
+		},
+		enumerable: true,
+		configurable: false 
+	});
+}
+ioWidget.prototype.onChange = function() {
+	var parent = this.parentNode.data;
+	parent.onUpdate.call(this);
 }
 
-//TODO: Add input/output to base slider widget
 //slider Widget
 function sliderWidget (element) {
 	widget.call(this, element);
@@ -270,12 +291,10 @@ sliderWidget.prototype = new widget();
 sliderWidget.prototype.constructor = sliderWidget;
 sliderWidget.prototype.initialize = function() {
 	widget.prototype.initialize.call(this);
-	//add the ioWidget
-	//can only initialize children, not next-of-kin
-	this.element.insertAdjacentHTML("afterend","<div data-class='ioWidget' data-properties='width:2'></div>");
-	this.output = this.element.nextSibling;
 	//hook up mouse events
 	this.element.addEventListener("mousedown",this.onMouseDown);
+	//hook up mobile touch event
+	this.element.addEventListener("touchstart", this.onMouseDown);
 	Object.defineProperty(this,"value",{
 		get: function() {
 			switch(this.properties.orientation){
@@ -319,7 +338,7 @@ sliderWidget.prototype.getHorizontal = function() {
 sliderWidget.prototype.setHorizontal = function(val) {
 	if(this.indicatorRef == undefined){return;}
 	var x = Math.max(Math.min(this.properties.upperLimit, val),this.properties.lowerLimit);
-	x = (x - this.properties.lowerLimit)/this.proerties.upperLimit;
+	x = (x - this.properties.lowerLimit)/this.properties.upperLimit;
 	x = x * (this.element.offsetWidth - this.indicatorRef.offsetWidth);
 	this.indicatorRef.style.left = x + "px";
 }
@@ -358,15 +377,24 @@ sliderWidget.prototype.onMouseDown = function (event) {
 	//bind the other mouse events.
 	document.addEventListener("mousemove", this.data.onMouseMove);
 	document.addEventListener("mouseup", this.data.onMouseUp);
+	//bind mobile touch events
+	document.addEventListener("touchmove", this.data.onMouseMove);
+	document.addEventListener("touchend", this.data.onMouseUp);
 	document.lastClicked = this;
 	this.data.setSliderPosition(event.pageX, event.pageY);
+	event.preventDefault();
 };
 sliderWidget.prototype.onMouseMove = function(event){
 	document.lastClicked.data.setSliderPosition(event.pageX,event.pageY);
+	event.preventDefault();
 };
 sliderWidget.prototype.onMouseUp = function (event) {
 	document.removeEventListener("mousemove", document.lastClicked.data.onMouseMove);
 	document.removeEventListener("mouseup", document.lastClicked.data.onMouseUp);
+	//remove mobile touch events
+	document.removeEventListener("touchmove", document.lastClicked.data.onMouseMove);
+	document.removeEventListener("touchend", document.lastClicked.data.onMouseUp);
+	event.preventDefault();
 };	
 
 //slider indicator
@@ -376,6 +404,59 @@ function sliderIndicator (element) {
 };
 sliderIndicator.prototype = new widget();
 sliderIndicator.prototype.constructor = sliderIndicator;
+
+//ioSlider widget
+function ioSliderWidget (element) {
+	widget.call(this,element);
+	this.properties = { viewMode:"both", orientation:"horizontal"};
+	this.members = [
+		{className:"sliderWidget", name:"slider"}
+	];
+}
+ioSliderWidget.prototype = new widget();
+ioSliderWidget.prototype.constructor = ioSliderWidget;
+ioSliderWidget.prototype.initialize = function () {
+	if(this.properties.orientation != "vertical" || this.properties.orientation != "horizontal"){
+		this.members.push({className:"ioWidget", name:"output"});
+	} else {
+		this.members.push({className:"ioWidget", name:"outputX"});
+		this.members.push({className:"ioWidget", name:"outputY"});
+	}
+	widget.prototype.initialize.call(this);
+};
+ioSliderWidget.prototype.postInitialize = function () {
+	widget.prototype.postInitialize.call(this);
+	var slider = this.slider.data;
+	if(this.properties.orientation != "vertical" || this.properties.orientation != "horizontal"){
+		var output = this.output.data;
+		output.onUpdate = function () { slider.value = ouput.value; };
+		slider.onUpdate = function () {output.value = slider.value; };
+		if(this.properties.viewMode != "output"){output.value = slider.value;}
+	} else {
+		var outputX = this.outputX.data, outputY = this.outputY.data;
+		outputX.onUpdate = function () { slider.value = [outputX.value, outputY.value];};
+		outputY.onUpdate = function () { slider.value = [outputX.value, outputY.value];};
+		slider.onUpdate = function () { outputX.value = slider.value.x; outputY.value = slider.value.y;};
+		if(this.properties.viewMode != "output"){
+			outputX.value = slider.value.x;
+			outputY.value = slider.value.y;
+		}
+	}
+}
+ioSliderWidget.prototype.changeViewMode = function (viewmode) {
+	if(viewmode===this.properties.viewMode){return;}
+	if(this.properties.viewMode != "both" || viewmode != "both"){
+		//toggling one for the other
+		//modify to use className instead of classList
+		this.element.classList.add("viewMode-"+viewmode);
+		this.element.classList.remove("viewMode-"+this.properties.viewMode);
+		this.slider.classList.add("viewMode-"+viewmode);
+		this.slider.classList.remove("viewMode-"+this.properties.viewMode);
+		this.output.classList.add("viewMode-"+viewmode);
+		this.output.classList.remove("viewMode-"+this.properties.viewMode);
+	} 
+}
+
 
 //rgb widget
 function rgbWidget (element) {
@@ -408,19 +489,6 @@ rgbWidget.prototype.setColor = function() {
 rgbWidget.prototype.setValues = function(){
 	//drive the sliders from external inputs
 }
-
-//rgb display widget
-function rgbDisplay (element) {
-	widget.call(this, element);
-	this.members = [
-		{ className:"ioWidget", name:"red", properties:{width:2}},
-		{ className:"ioWidget", name:"green", properties:{width:2}},
-		{ className:"ioWidget", name:"blue", properties:{width:2}}
-	];
-	this.color = new PXL();
-}
-rgbDisplay.prototype = new widget();
-rgbDisplay.prototype.constructor = rgbDisplay;
 
 //color picker
 function colorPickerWidget (element) {

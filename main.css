@@ -35,6 +35,29 @@ input::-webkit-inner-spin-button
 	width : 100%;
 	margin: 0.2em 0em;
 }
+.ioSliderWidget
+{
+	overflow:hidden;
+}
+.ioSliderWidget > .sliderWidget.orientation-horizontal.viewMode-both
+{
+	width: calc(100% - 6em);
+	float:left;
+}
+.ioSliderWidget>.sliderWidget.viewMode-output
+{
+	display:none;
+}
+ .ioSliderWidget>.ioWidget.viewMode-slider
+ {
+	display:none;
+}
+
+.ioSliderWidget> .ioWidget.viewMode-both
+{
+	float:right;
+}
+
 .sliderWidget.orientation-horizontal.type-hue
 {
 	background : -webkit-linear-gradient(left, red, yellow, green, cyan, blue, magenta, red);
@@ -82,7 +105,8 @@ input::-webkit-inner-spin-button
 
 .ioWidget
 {
-	margin: 0.2em 0em;
+	margin: 0.2em 0.5em;
+	display:inline-block;
 }
 .ioWidget > input, .ioWidget > input:focus
 {
