@@ -2,7 +2,7 @@
 //TODO: Move functions out of constructors. 
 //They get duplicated with each instantiation.
 //Declare them in a prototype instead.
-//This is not built on jquery, so don't use those functions
+//http://en.wikipedia.org/wiki/HSL_and_HSV#Converting_to_RGB
 function PXL (){
 	//This is schema is optimized for memory, but is slow on performance
 	/*
@@ -74,9 +74,25 @@ function PXL (){
 }
 PXL.prototype.setValue = function(val) {
 	var outValue = val;
-	if(val >= 0 && val <=1){ outValue = Math.floor(val * 255);}
+	if(val >= 0 && val <=1 && val.indexOf(".")>-1){ outValue = Math.floor(val * 255);}
 	outValue = Math.max(0,Math.min(255,Math.floor(outValue)));
 	return outValue;
+}
+PXL.prototype.toColor = function(){
+	var output;
+	switch(typeof arguments[0]){
+		case "string":
+			switch(arguments[0]){
+				case "rgb":
+					output = this.red+","+this.green+","+this.blue;
+					break;
+			}
+			break;
+		default:
+			output = this.red+","+this.green+","+this.blue+","+this.alpha;
+			break;
+	}
+	return output;
 }
 
 function PXLmap (){
@@ -158,7 +174,6 @@ var Application = {
 						thisNode.data[key] = newClassObject[key];
 					}
 				}
-				//thisNode.data = new window[thisClass](thisNode);
 				thisNode.data.initialize();
 				app.initializeClasses(thisNode.children);
 				thisNode.data.postInitialize();
@@ -168,6 +183,7 @@ var Application = {
 };
 
 //base abstract class to base all widgets on
+//TODO: remove unneccessary markup (data-class, data-properties, etc) after initialization)
 function widget(element) {
 	this.element = element;
 };
@@ -176,6 +192,7 @@ widget.prototype.initialize = function(){
 	 //get properties
 	 var htmlProperties = this.element.getAttribute("data-properties");
 	 if(htmlProperties != undefined && htmlProperties != ""){
+		if(this.properties == undefined){this.properties = {};};
 		var pairs = htmlProperties.split(",");
 		for( var i=0; i < pairs.length; i++ ){
 			var keyValue = pairs[i].split(":");
@@ -197,11 +214,13 @@ widget.prototype.initialize = function(){
 	 //spawn members
 	 if(this.members != undefined){
 		//members should be an array of objects
-		//each object has className and properties
+		//each object can have className, properties, attributes, and a tag
 		var html = "";
 		for(var i=0;i<this.members.length;i++){
 			var thisMember = this.members[i];
-			html += "<div data-class='"+thisMember.className+"'";
+			var tag = (thisMember.tag == undefined)?"div":thisMember.tag;
+			html += "<"+tag+" data-class='"+thisMember.className+"'";
+			//add class properties
 			if(thisMember.properties != undefined || this.properties != undefined){
 				//build a master list of properties, including overridden properties
 				var theseProperties = (this.properties == undefined)?{}:this.properties;
@@ -217,7 +236,13 @@ widget.prototype.initialize = function(){
 				htmlProperties += "'";
 				html += htmlProperties;
 			}
-			html += "></div>";
+			//add tag attributes
+			if(thisMember.attributes != undefined){
+				for(var key in thisMember.attributes){
+					html += " " + key + "=" + thisMember.attributes[key];
+				}
+			}
+			html += "></"+tag+">";
 		}
 		this.element.innerHTML = html;
 		//save references to each
@@ -290,47 +315,33 @@ widget.prototype.animate = function (property, value, time, callback){
 //input/output widget
 function ioWidget (element) {
 	widget.call(this, element);
-	this.properties = { type: "number" , size: "3"};
 }
 ioWidget.prototype = new widget();
 ioWidget.prototype.constructor = ioWidget;
 ioWidget.prototype.initialize = function () {
+	//ensure that we're on an input tag
+	if(this.element.tagName != "INPUT"){ return; }
 	widget.prototype.initialize.call(this);
-	//add our input
-	this.element.innerHTML = "<input type='"+this.properties.type+"' size='"+this.properties.size+"' style='width:"+this.properties.size+"em;'/>";
-	this.input = this.element.children[0];
-	if(this.properties.width != undefined){
-		this.input.style.width = this.properties.width + "em";
-	}
 	//hook up onUpdate default handler
-	this.input.onchange = this.onChange;
-	//set virtual 'value' property
+	this.element.onchange = this.onChange;
 	Object.defineProperty(this, "value", {
-		get: function () {
-			return this.input.value;
-		},
-		set: function (val) {
-			this.input.value = val;
-		},
+		get: function(){return this.element.value;},
+		set: function(value){this.element.value = value;},
 		enumerable: true,
-		configurable: false 
+		configurable: false
 	});
 }
 ioWidget.prototype.onChange = function() {
-	var parent = this.parentNode.data;
-	parent.onUpdate.call(this);
-}
-ioWidget.prototype.animate = function(property, value, time, callback){
-	if(callback != undefined){
-		var parent = this,
-		callbackFunction = function(){
-			callback();
-			parent.input.removeEventListener('webkitTransitionEnd', callbackFunction);
-		};
-		this.input.addEventListener('webkitTransitionEnd', callbackFunction);
+	var parent = this.data;
+	if(parent.element.getAttribute("type") == "number"){
+		var value = parent.element.value;
+		value = Math.max(parent.properties.lowerLimit,Math.min(parent.properties.upperLimit, value));
+		if(parent.properties.output == "int"){
+			value = Math.round(value);
+		}
+		parent.element.value = value;
 	}
-	this.input.style.transition = property + " " + time +"ms";
-	this.input.style[property] = value;
+	parent.onUpdate.call(this);
 }
 
 //slider Widget
@@ -339,7 +350,8 @@ function sliderWidget (element) {
 	this.properties = {
 		orientation: "horizontal",
 		lowerLimit:0,
-		upperLimit:1
+		upperLimit:1,
+		output:"float"
 	};
 	this.members = [{className:"sliderIndicator", name:"indicatorRef"}];
 }
@@ -383,13 +395,32 @@ sliderWidget.prototype.initialize = function() {
 		configurable: false 
     });
 };
+sliderWidget.prototype.postInitialize = function(){
+	widget.prototype.postInitialize.call(this);
+	if(this.properties.orientation == "pane"){
+		this.setHeight();
+	}
+}
+sliderWidget.prototype.setHeight = function(val){
+	if(val != undefined){
+		this.element.style.height = val + "px";
+	} else {
+		this.element.style.height = this.element.offsetWidth + "px";
+	}
+}
+sliderWidget.prototype.checkValue = function(value){
+	if(this.properties.output == "int"){
+		return Math.round(value);
+	}
+	return value;
+}
 sliderWidget.prototype.getHorizontal = function() {
 	if(this.indicatorRef == undefined){return;}
 	var x = this.indicatorRef.style.left; 
 	x = x.slice(0,x.length-2); //remove 'px' and cast to number
 	x = x / (this.element.offsetWidth - this.indicatorRef.offsetWidth);
 	x = (this.properties.lowerLimit * (1 - x)) + (this.properties.upperLimit * x);
-	return x;
+	return this.checkValue(x);
 }
 sliderWidget.prototype.setHorizontal = function(val) {
 	if(this.indicatorRef == undefined){return;}
@@ -404,7 +435,7 @@ sliderWidget.prototype.getVertical = function() {
 	y = y.slice(0,y.length-2); //remove 'px' and cast to number
 	y = y / (this.element.offsetHeight - this.indicatorRef.offsetHeight);
 	y = (this.properties.lowerLimit * (1 - y)) + (this.properties.upperLimit * y);
-	return y;
+	return this.checkValue(y);
 }
 sliderWidget.prototype.setVertical = function(val) {
 	if(this.indicatorRef == undefined){return;}
@@ -462,42 +493,70 @@ sliderIndicator.prototype = new widget();
 sliderIndicator.prototype.constructor = sliderIndicator;
 
 //ioSlider widget
-function ioSliderWidget (element) {
+//TODO: re-work changeViewMode function
+function ioSliderWidget(element) {
 	widget.call(this,element);
-	this.properties = { viewMode:"both", orientation:"horizontal"};
+	this.properties = { 
+		viewMode:"both", 
+		orientation:"horizontal",
+		upperLimit: 1,
+		lowerLimit:0
+	};
 	this.members = [
-		{className:"sliderWidget", name:"slider"}
+		{className:"sliderWidget", name:"slider"},
+		{className:"ioWidget", name:"output", tag:"input", properties:{output:"int"}, attributes:{type:"number", size:3, pattern:"/d/d/d", step:1}},
+		{className:"ioWidget", name:"outputX", tag:"input", properties:{output:"int"}, attributes:{type:"number", size:3, pattern:"/d/d/d", step:1}},
+		{className:"ioWidget", name:"outputY", tag:"input", properties:{output:"int"}, attributes:{type:"number", size:3, pattern:"/d/d/d", step:1}}
 	];
 }
 ioSliderWidget.prototype = new widget();
 ioSliderWidget.prototype.constructor = ioSliderWidget;
 ioSliderWidget.prototype.initialize = function () {
-	if(this.properties.orientation != "vertical" || this.properties.orientation != "horizontal"){
-		this.members.push({className:"ioWidget", name:"output"});
-	} else {
-		this.members.push({className:"ioWidget", name:"outputX"});
-		this.members.push({className:"ioWidget", name:"outputY"});
-	}
 	widget.prototype.initialize.call(this);
+	if(this.properties.orientation == "vertical" || this.properties.orientation == "horizontal"){
+		this.element.removeChild(this.outputX);
+		this.element.removeChild(this.outputY);
+		this.outputX = undefined;
+		this.outputY = undefined;
+	} else {
+		this.element.removeChild(this.output);
+		this.output = undefined;
+	}
+	//set virtual property
+	Object.defineProperty(this, "value", {
+		get: function(){
+			return this.output.value;
+		},
+		set: function(value){
+			this.output.value = value;
+			this.output.onUpdate();
+		},
+		enumerable:true,
+		configurable:false
+	});
 };
 ioSliderWidget.prototype.postInitialize = function () {
 	widget.prototype.postInitialize.call(this);
-	var slider = this.slider.data;
-	if(this.properties.orientation != "vertical" || this.properties.orientation != "horizontal"){
+	var slider = this.slider.data,
+	parent = this;
+	if(this.properties.orientation == "vertical" || this.properties.orientation == "horizontal"){
 		var output = this.output.data;
-		output.onUpdate = function () { slider.value = ouput.value; };
-		slider.onUpdate = function () {output.value = slider.value; };
+		output.onUpdate = function () { slider.value = output.value; parent.onUpdate();};
+		slider.onUpdate = function () {output.value = slider.value; parent.onUpdate();};
 		if(this.properties.viewMode != "output"){output.value = slider.value;}
 	} else {
 		var outputX = this.outputX.data, outputY = this.outputY.data;
-		outputX.onUpdate = function () { slider.value = [outputX.value, outputY.value];};
-		outputY.onUpdate = function () { slider.value = [outputX.value, outputY.value];};
+		outputX.onUpdate = function () { slider.value = [outputX.value, outputY.value];parent.onUpdate();};
+		outputY.onUpdate = function () { slider.value = [outputX.value, outputY.value];parent.onUpdate();};
 		slider.onUpdate = function () { outputX.value = slider.value.x; outputY.value = slider.value.y;};
 		if(this.properties.viewMode != "output"){
 			outputX.value = slider.value.x;
 			outputY.value = slider.value.y;
 		}
 	}
+}
+ioSliderWidget.prototype.onUpdate = function(){
+	//placeholder function for other objects to override
 }
 ioSliderWidget.prototype.changeViewMode = function (viewmode) {
 	if(viewmode===this.properties.viewMode){return;}
@@ -518,16 +577,17 @@ ioSliderWidget.prototype.changeViewMode = function (viewmode) {
 	} 
 	*/
 	var parent = this,
+	startViewMode = this.properties.viewMode,
 	slider = this.slider.data,
 	output = (this.properties.orientation == "pane")?[this.ouputX.data, this.outputY.data]:[this.output.data];
 	switch(viewmode){
 		case "slider":
 			//hide outputs
-			output.forEach(function(element){ element.animate("width",0,200, function(){
+			output.forEach(function(element){ element.animate("width","0em",200, function(){
 				output.forEach(function(element){ element.animate("opacity",0,100, function(){
 					output.forEach(function(element){element.element.style.display = "none";});
 					//show sliders
-					if(parent.properties.viewMode == "output"){
+					if(startViewMode == "output"){
 						slider.element.style.display = null;
 						slider.animate("opacity", 1, 100, function(){
 							slider.animate("width", "100%", 200);
@@ -543,51 +603,92 @@ ioSliderWidget.prototype.changeViewMode = function (viewmode) {
 			slider.animate("width", "0%", 200, function(){
 				slider.animate("opacity", 0, 100, function(){
 					slider.element.style.display = "none";
-					if(parent.properties.viewMode == "slider"){
-						console.log("blah");
-					} else {
+					if(startViewMode == "slider"){
+						//display the output
 						output.forEach(function(element){
-							element.element.style.float = "left";
+							element.element.style.display = null;
+							element.animate("opacity", 1, 100);
+							element.animate("width", "3em", 200);
 						});
-					}
+					} 
 				});
 			});
+			break;
+		default:
+		
 			break;
 	}
 	this.properties.viewMode = viewmode;
 }
 
+//color swatch widget
+function swatchWidget(element) {
+	widget.call(this, element);
+}
+swatchWidget.prototype = new widget();
+swatchWidget.prototype.constructor = swatchWidget;
 
 //rgb widget
-function rgbWidget (element) {
+function rgbWidget(element) {
 	widget.call(this, element);
 	this.members = [
-		{ className:"sliderWidget", name:"red", 
-	        properties:{orientation:"horizontal",type:"red" , upperLimit:255 }},
-	    { className:"sliderWidget", name:"green", 
-	        properties:{orientation:"horizontal",type:"green" , upperLimit:255 }},
-	    { className:"sliderWidget", name:"blue", 
-	        properties:{orientation:"horizontal",type:"blue" , upperLimit:255 }}
+		{ className:"ioSliderWidget", name:"red", 
+	        properties:{orientation:"horizontal", type:"red", upperLimit:255, output:"int"}},
+	    { className:"ioSliderWidget", name:"green", 
+	        properties:{orientation:"horizontal",type:"green", upperLimit:255, output:"int" }},
+	    { className:"ioSliderWidget", name:"blue", 
+	        properties:{orientation:"horizontal",type:"blue", upperLimit:255, output:"int" }},
+		{ className:"swatchWidget", name:"swatch" }
 	];
 	this.color = new PXL();
 }
 rgbWidget.prototype = new widget();
 rgbWidget.prototype.constructor = rgbWidget;
-rgbWidget.prototype.initialize = function() {
+rgbWidget.prototype.initialize = function(){
 	widget.prototype.initialize.call(this);
+	Object.defineProperty(this, "color", {
+	
+	});
+}
+rgbWidget.prototype.postInitialize = function() {
+	widget.prototype.postInitialize.call(this);
 	var parent = this,
 	parentSetColor = function(){parent.setColor.call(parent);};
-	this.red.data = {onUpdate : parentSetColor};
-	this.green.data = {onUpdate : parentSetColor};
-	this.blue.data = {onUpdate : parentSetColor};
+	this.red.data.onUpdate = parentSetColor;
+	this.green.data.onUpdate = parentSetColor;
+	this.blue.data.onUpdate = parentSetColor;
 }
 rgbWidget.prototype.setColor = function() {
 	this.color.red = this.color.setValue(this.red.data.value);
 	this.color.green = this.color.setValue(this.green.data.value);
 	this.color.blue = this.color.setValue(this.blue.data.value);
+	var thisColor = "rgb("+this.color.toColor("rgb")+")";
+	this.swatch.data.element.style.background = thisColor;
 }
 rgbWidget.prototype.setValues = function(){
 	//drive the sliders from external inputs
+}
+
+//hsl widget
+//hsv widget
+function hsvWidget(element){
+	widget.call(this,element);
+	this.members = [
+		{ className:"ioSliderWidget", name:"hue", properties:{
+			orientation:"vertical", type:"hue", upperLimit:360, output:"int"}},
+		{ className:"ioSliderWidget", name:"satval", properties:{
+			orientation:"pane", type:"satval"}}
+	];
+}
+hsvWidget.prototype = new widget();
+hsvWidget.prototype.constructor = hsvWidget;
+hsvWidget.prototype.postInitialize = function(){
+	widget.prototype.postInitialize.call(this);
+	//hook up specialized behavior
+	this.hue.data.onUpdate = this.setHue;
+}
+hsvWidget.prototype.setHue = function(){
+	debugger;
 }
 
 //color picker

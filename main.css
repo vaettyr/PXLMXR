@@ -28,42 +28,50 @@ input::-webkit-inner-spin-button
 	width : 2em;
 	background-color : rgb(26,26,26);
 	border-radius : 0.5em;
+	flex:1 1 100%;
+	margin:0.25em;
 }
-
+/*
 .sliderWidget.orientation-horizontal
 {
 	width : 100%;
 	margin: 0.2em 0em;
 }
-.ioSliderWidget
+
+.sliderWidget.orientation-pane
 {
-	overflow:hidden;
-}
-.ioSliderWidget > .sliderWidget.orientation-horizontal.viewMode-both
-{
-	width: calc(100% - 6em);
-	float:left;
-}
-.ioSliderWidget>.sliderWidget.viewMode-output
-{
-	display:none;
-}
- .ioSliderWidget>.ioWidget.viewMode-slider
- {
-	display:none;
-}
-.ioSliderWidget>.sliderWidget.viewMode-output.sliderIndicator
-{
-	display:none;
-}
-.ioSliderWidget> .ioWidget.viewMode-both
-{
-	float:right;
+	height : 100%;
+	width : 100%;
 }
 
+.sliderWidget.orientation-vertical
+{
+	height : 100%;
+}
+*/
+.ioSliderWidget
+{
+	display:flex;
+}
+.ioSliderWidget.orientation-pane
+{
+	flex-wrap:wrap;
+	flex:1 1 auto;
+}
+.ioSliderWidget.orientation-vertical
+{
+	display:inline-flex;
+	flex-direction:column;
+	flex:1 1 auto;
+	max-width:2.5em;
+}
 .sliderWidget.orientation-horizontal.type-hue
 {
 	background : -webkit-linear-gradient(left, red, yellow, green, cyan, blue, magenta, red);
+}
+.sliderWidget.orientation-vertical.type-hue
+{
+	background: -webkit-linear-gradient(top, red, yellow, green, cyan, blue, magenta, red);
 }
 .sliderWidget.orientation-horizontal.type-red
 {
@@ -77,18 +85,20 @@ input::-webkit-inner-spin-button
 {
 	background : -webkit-linear-gradient(left, black, blue);
 }
-
-.sliderWidget.orientation-pane
+.sliderWidget.orientation-pane.type-satval
 {
-	height : 100%;
-	width : 100%;
+	background: -webkit-linear-gradient(left, white, red);
 }
-
-.sliderWidget.orientation-vertical
+.sliderWidget.orientation-pane.type-satval:after
 {
-	height : 100%;
+	content:"";
+	background:-webkit-linear-gradient(top, rgba(0,0,0,0), rgba(0,0,0,1));
+	position:absolute;
+	top:0;
+	left:0;
+	right:0;
+	bottom:0;
 }
-
 .sliderIndicator
 {
 	position : absolute;
@@ -106,18 +116,27 @@ input::-webkit-inner-spin-button
 	left : -0.25em;
 }
 
-.ioWidget
+.swatchWidget
 {
-	margin: 0.2em 0.5em;
-	display:inline-block;
+	width:5em;
+	height:5em;
+	border-radius:0.5em;
 }
-.ioWidget > input, .ioWidget > input:focus
+
+.hsvWidget
 {
-	height: 2em;
-	padding: 0em 1em;
+	display:flex;
+	flex-direction:row-reverse;
+}
+
+input.ioWidget , input.ioWidget:focus
+{
 	border-radius: 0.5em;
 	border: 1px solid black;
 	outline-width:0;
 	box-sizing: content-box;
-	transition: width 200ms, opacity 200ms;
+	min-height:2em;
+	text-align:center;
+	flex:1 1 auto;
+	max-height:2em;
 }
