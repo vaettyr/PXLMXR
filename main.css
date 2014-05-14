@@ -52,7 +52,10 @@ input::-webkit-inner-spin-button
  {
 	display:none;
 }
-
+.ioSliderWidget>.sliderWidget.viewMode-output.sliderIndicator
+{
+	display:none;
+}
 .ioSliderWidget> .ioWidget.viewMode-both
 {
 	float:right;
@@ -116,4 +119,5 @@ input::-webkit-inner-spin-button
 	border: 1px solid black;
 	outline-width:0;
 	box-sizing: content-box;
+	transition: width 200ms, opacity 200ms;
 }

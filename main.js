@@ -242,6 +242,50 @@ widget.prototype.getPropertiesString = function () {
 		return propertiesString;
 	}
 }
+widget.prototype.getClasses = function () {
+	return this.element.className.split(" ");
+}
+widget.prototype.setClasses = function () {
+	var classes = "", 
+	classlist = (typeof arguments[0] === "string") ? arguments : arguments[0];
+	for(var i=0;i<classlist.length;i++){
+		if(i>0){classes += " ";};
+		classes += classlist[i];
+	}
+	this.element.className = classes;
+}
+widget.prototype.hasClass = function (classname) {
+	return this.getClasses().indexOf(classname) >= 0;
+}
+widget.prototype.addClass = function (classname) {
+	if(!this.hasClass(classname)){
+		var classes = this.getClasses();
+		classes.push(classname);
+		this.setClasses(classes);
+		return true;
+	}
+	return false;
+}
+widget.prototype.removeClass = function (classname) {
+	if(this.hasClass(classname)){
+		var classes = this.getClasses();
+		classes.splice(classes.indexOf(classname),1);
+		this.setClasses(classes);
+	}
+	return false;
+}
+widget.prototype.animate = function (property, value, time, callback){
+	if(callback != undefined){
+		var parent = this,
+		callbackFunction = function(){
+			callback();
+			parent.element.removeEventListener('webkitTransitionEnd', callbackFunction);
+		};
+		this.element.addEventListener('webkitTransitionEnd', callbackFunction);
+	}
+	this.element.style.transition = property + " " + time +"ms";
+	this.element.style[property] = value;
+}
 
 //input/output widget
 function ioWidget (element) {
@@ -275,6 +319,18 @@ ioWidget.prototype.initialize = function () {
 ioWidget.prototype.onChange = function() {
 	var parent = this.parentNode.data;
 	parent.onUpdate.call(this);
+}
+ioWidget.prototype.animate = function(property, value, time, callback){
+	if(callback != undefined){
+		var parent = this,
+		callbackFunction = function(){
+			callback();
+			parent.input.removeEventListener('webkitTransitionEnd', callbackFunction);
+		};
+		this.input.addEventListener('webkitTransitionEnd', callbackFunction);
+	}
+	this.input.style.transition = property + " " + time +"ms";
+	this.input.style[property] = value;
 }
 
 //slider Widget
@@ -445,16 +501,60 @@ ioSliderWidget.prototype.postInitialize = function () {
 }
 ioSliderWidget.prototype.changeViewMode = function (viewmode) {
 	if(viewmode===this.properties.viewMode){return;}
+	/*
 	if(this.properties.viewMode != "both" || viewmode != "both"){
-		//toggling one for the other
-		//modify to use className instead of classList
-		this.element.classList.add("viewMode-"+viewmode);
-		this.element.classList.remove("viewMode-"+this.properties.viewMode);
-		this.slider.classList.add("viewMode-"+viewmode);
-		this.slider.classList.remove("viewMode-"+this.properties.viewMode);
-		this.output.classList.add("viewMode-"+viewmode);
-		this.output.classList.remove("viewMode-"+this.properties.viewMode);
+		var parent = this,
+		elements = [this, this.slider.data];
+		if(this.properties.orientation == "pane"){
+			elements.push(this.outputX.data);
+			elements.push(this.ouputY.data);
+		} else {
+			elements.push(this.output.data);
+		}
+		elements.forEach(function(element){
+			element.addClass("viewMode-"+viewmode);
+			element.removeClass("viewMode-"+parent.properties.viewMode);
+		});
 	} 
+	*/
+	var parent = this,
+	slider = this.slider.data,
+	output = (this.properties.orientation == "pane")?[this.ouputX.data, this.outputY.data]:[this.output.data];
+	switch(viewmode){
+		case "slider":
+			//hide outputs
+			output.forEach(function(element){ element.animate("width",0,200, function(){
+				output.forEach(function(element){ element.animate("opacity",0,100, function(){
+					output.forEach(function(element){element.element.style.display = "none";});
+					//show sliders
+					if(parent.properties.viewMode == "output"){
+						slider.element.style.display = null;
+						slider.animate("opacity", 1, 100, function(){
+							slider.animate("width", "100%", 200);
+						});
+					} else {
+						slider.animate("width", "100%", 200);
+					}
+				})});
+			})});
+			break;
+		case "output":
+			//hide slider
+			slider.animate("width", "0%", 200, function(){
+				slider.animate("opacity", 0, 100, function(){
+					slider.element.style.display = "none";
+					if(parent.properties.viewMode == "slider"){
+						console.log("blah");
+					} else {
+						output.forEach(function(element){
+							element.element.style.float = "left";
+						});
+					}
+				});
+			});
+			break;
+	}
+	this.properties.viewMode = viewmode;
 }
 
 
