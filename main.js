@@ -94,6 +94,35 @@ PXL.prototype.toColor = function(){
 	}
 	return output;
 }
+PXL.prototype.HSVtoRGB = function(h,s,v){
+	var c = v * s,
+	newH = h/60,
+	x = c * (1 - Math.abs(newH%2-1)),
+	color;
+	switch (newH - (newH%1)){
+		case 0:
+			color = [c,x,0];
+			break;
+		case 1:
+			color = [x,c,0];
+			break
+		case 2:
+			color = [0,c,x];
+			break;
+		case 3:
+			color = [0,x,c];
+			break;
+		case 4:
+			color = [x,0,c];
+			break;
+		default:
+			color = [c,0,x];
+			break;
+	}
+	var m = v - c;
+	color = [Math.round(255*(color[0]+m)), Math.round(255*(color[1]+m)), Math.round(255*(color[2]+m))];
+	return color;	
+}
 
 function PXLmap (){
 	this.pxls = [];
@@ -520,22 +549,37 @@ ioSliderWidget.prototype.initialize = function () {
 		this.element.removeChild(this.outputY);
 		this.outputX = undefined;
 		this.outputY = undefined;
+		//set virtual property
+		Object.defineProperty(this, "value", {
+			get: function(){
+				return this.output.value;
+			},
+			set: function(value){
+				this.output.value = value;
+				this.output.onUpdate();
+			},
+			enumerable:true,
+			configurable:false
+		});
 	} else {
 		this.element.removeChild(this.output);
 		this.output = undefined;
+		//set virtual property
+		Object.defineProperty(this, "value", {
+			get: function(){
+				return {x:this.outputX.value, y:this.outputY.value};
+			},
+			set: function(value){
+				this.outputX.value = value[0];
+				this.outputY.value = value[1];
+				this.outputX.onUpdate();
+				this.outputY.onUpdate();
+			},
+			enumerable:true,
+			configurable:false
+		});
 	}
-	//set virtual property
-	Object.defineProperty(this, "value", {
-		get: function(){
-			return this.output.value;
-		},
-		set: function(value){
-			this.output.value = value;
-			this.output.onUpdate();
-		},
-		enumerable:true,
-		configurable:false
-	});
+	
 };
 ioSliderWidget.prototype.postInitialize = function () {
 	widget.prototype.postInitialize.call(this);
@@ -550,7 +594,7 @@ ioSliderWidget.prototype.postInitialize = function () {
 		var outputX = this.outputX.data, outputY = this.outputY.data;
 		outputX.onUpdate = function () { slider.value = [outputX.value, outputY.value];parent.onUpdate();};
 		outputY.onUpdate = function () { slider.value = [outputX.value, outputY.value];parent.onUpdate();};
-		slider.onUpdate = function () { outputX.value = slider.value.x; outputY.value = slider.value.y;};
+		slider.onUpdate = function () { outputX.value = slider.value.x; outputY.value = slider.value.y;parent.onUpdate();};
 		if(this.properties.viewMode != "output"){
 			outputX.value = slider.value.x;
 			outputY.value = slider.value.y;
@@ -682,6 +726,7 @@ function hsvWidget(element){
 			orientation:"pane", type:"satval"}},
 		{ className:"swatchWidget", name:"swatch" }
 	];
+	this.color = new PXL();
 }
 hsvWidget.prototype = new widget();
 hsvWidget.prototype.constructor = hsvWidget;
@@ -690,37 +735,16 @@ hsvWidget.prototype.postInitialize = function(){
 	//hook up specialized behavior
 	var parent = this;
 	this.hue.data.onUpdate = function(){ parent.setHue();};
+	this.satval.data.onUpdate = function(){parent.setColor();};
 }
 hsvWidget.prototype.setHue = function(){
-	var value = this.hue.data.value/60, x = Math.round(255 * (1 - Math.abs(value%2-1))), color;
-	switch(value - (value%1)){
-		case 0:
-			color = [255,x,0];
-			break;
-		case 1:
-			color = [x,255,0];
-			break
-		case 2:
-			color = [0,255,x];
-			break;
-		case 3:
-			color = [0,x,255];
-			break;
-		case 4:
-			color = [x,0,255];
-			break;
-		default:
-			color = [255,0,x];
-			break;
-	}
+	var color = this.color.HSVtoRGB(this.hue.data.value,1,1);
 	this.satval.data.slider.data.element.style.background = "-webkit-linear-gradient(left, white, rgb("+color[0]+","+color[1]+","+color[2]+")";
-}
-hsvWidget.prototype.getHue = function(value){
-	value = value/60;
-	var x = 0;
+	this.setColor();
 }
 hsvWidget.prototype.setColor = function(){
-
+	var color = this.color.HSVtoRGB(this.hue.data.value,this.satval.data.value.x, 1 - this.satval.data.value.y);
+	this.swatch.data.element.style.background = "rgb("+color[0]+","+color[1]+","+color[2]+")";
 }
 
 //color picker
