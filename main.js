@@ -184,6 +184,8 @@ var Application = {
 
 //base abstract class to base all widgets on
 //TODO: remove unneccessary markup (data-class, data-properties, etc) after initialization)
+//TODO: break out some properties to 'settings'
+//settings are mutable and can be stored in a profile. Properties are not
 function widget(element) {
 	this.element = element;
 };
@@ -677,7 +679,8 @@ function hsvWidget(element){
 		{ className:"ioSliderWidget", name:"hue", properties:{
 			orientation:"vertical", type:"hue", upperLimit:360, output:"int"}},
 		{ className:"ioSliderWidget", name:"satval", properties:{
-			orientation:"pane", type:"satval"}}
+			orientation:"pane", type:"satval"}},
+		{ className:"swatchWidget", name:"swatch" }
 	];
 }
 hsvWidget.prototype = new widget();
@@ -685,10 +688,39 @@ hsvWidget.prototype.constructor = hsvWidget;
 hsvWidget.prototype.postInitialize = function(){
 	widget.prototype.postInitialize.call(this);
 	//hook up specialized behavior
-	this.hue.data.onUpdate = this.setHue;
+	var parent = this;
+	this.hue.data.onUpdate = function(){ parent.setHue();};
 }
 hsvWidget.prototype.setHue = function(){
-	debugger;
+	var value = this.hue.data.value/60, x = Math.round(255 * (1 - Math.abs(value%2-1))), color;
+	switch(value - (value%1)){
+		case 0:
+			color = [255,x,0];
+			break;
+		case 1:
+			color = [x,255,0];
+			break
+		case 2:
+			color = [0,255,x];
+			break;
+		case 3:
+			color = [0,x,255];
+			break;
+		case 4:
+			color = [x,0,255];
+			break;
+		default:
+			color = [255,0,x];
+			break;
+	}
+	this.satval.data.slider.data.element.style.background = "-webkit-linear-gradient(left, white, rgb("+color[0]+","+color[1]+","+color[2]+")";
+}
+hsvWidget.prototype.getHue = function(value){
+	value = value/60;
+	var x = 0;
+}
+hsvWidget.prototype.setColor = function(){
+
 }
 
 //color picker
