@@ -167,6 +167,10 @@ function PXLmap (){
 	}
 }
 
+//initialization sequence is as follows:
+//initialize (set variables, no children spawned yet)
+//postinitialize (immediate children spawned, siblings may not be active)
+//start (all children and siblings spawned)
 //TODO: add support for compound selectors (csv)
 var Application = {
 	initialize: function(elementList){
@@ -187,6 +191,7 @@ var Application = {
 			}
 		}
 		this.initializeClasses();
+		this.startClasses();
 	},
 	initializeClasses: function(elementList){
 		var app = this;
@@ -208,31 +213,45 @@ var Application = {
 				thisNode.data.postInitialize();
 			}
 		}
+	},
+	startClasses: function(elementList){
+		var app = this;
+		if(elementList == undefined) { elementList = document.querySelectorAll("[data-class]");}
+		for(var index in elementList){
+			var member = elementList[index].data;
+			if(member != undefined){
+				elementList[index].data.start();
+			}
+		}
 	}
 };
 
 //base abstract class to base all widgets on
 //TODO: remove unneccessary markup (data-class, data-properties, etc) after initialization)
 //TODO: break out some properties to 'settings'
+//TODO: make the initializer abstract wrt properties, attributes, etc
 //settings are mutable and can be stored in a profile. Properties are not
 function widget(element) {
 	this.element = element;
 };
 widget.prototype.initialize = function(){
 	 var className = this.constructor.name;
-	 //get properties
-	 var htmlProperties = this.element.getAttribute("data-properties");
-	 if(htmlProperties != undefined && htmlProperties != ""){
-		if(this.properties == undefined){this.properties = {};};
-		var pairs = htmlProperties.split(",");
-		for( var i=0; i < pairs.length; i++ ){
-			var keyValue = pairs[i].split(":");
-			if(keyValue.length == 2 && keyValue[0].trim()!="" && keyValue[1].trim() != ""){
-				this.properties[keyValue[0].trim()] = keyValue[1].trim();
+	 //load initialization data from html mark-up
+	 var htmlAttributes = this.element.attributes;
+	 for(var index in htmlAttributes){
+		if(htmlAttributes[index].name!=undefined && htmlAttributes[index].name.match(/^data-(?!class)/i)){
+			var content = this.parseHTML(htmlAttributes[index].value),
+			attribute = htmlAttributes[index].name.slice(5);
+			if(this[attribute] == undefined || typeof content != "object" || content instanceof Array){
+				this[attribute] = content;
+			} else {
+				for(var key in content){
+					this[attribute][key] = content[key];
+				}
 			}
 		}
 	 }
-	 //set classes
+	 //set classes based on properties and settings
 	if(this.properties != undefined){
 		for(var property in this.properties){
 			//check to see if this class (or a derivative) exists before adding it
@@ -261,7 +280,7 @@ widget.prototype.initialize = function(){
 				html += " data-properties='";
 				var htmlProperties = "";	
 				for(var key in theseProperties){
-					if (htmlProperties.length > 0){htmlProperties +=",";}
+					if (htmlProperties.length > 0){htmlProperties +=";";}
 					htmlProperties += key + ":" + theseProperties[key];
 				}
 				htmlProperties += "'";
@@ -282,8 +301,46 @@ widget.prototype.initialize = function(){
 		}
 	 }
 };
+widget.prototype.parseHTML = function(html){
+	var parsed;
+	var parseInnerHTML = function(element){
+		var thisValue;
+		if(element.trim().indexOf(":") >= 0){
+			//object
+			thisValue = {};
+			element = element.trim().split(";");
+			for(var index in element){
+				var pair = element[index].split(":");
+				thisValue[pair[0]] = pair[1];
+			}
+		} else if(element.trim().indexOf(" ") >= 0){
+			//array
+			thisValue = element.trim().split(" ");
+		} else {
+			//string
+			thisValue = element.trim();
+		}
+		return thisValue;
+	}
+	if(html.indexOf(",")>=0){
+		parsed = [];
+		html = html.split(",");
+		html.forEach(function(element){
+			parsed.push(parseInnerHTML(element));
+		});
+	} else {
+		parsed = parseInnerHTML(html);
+	}
+	return parsed;
+}
+widget.prototype.toHTML = function(element){
+	//takes an object (probably from this.members) and formats it as an html element
+}
 widget.prototype.postInitialize = function(){
 	//placeholder function that is called when all of a widget's members have been initialized
+}
+widget.prototype.start = function(){
+	//placeholder function that is called when the entire application is initialized
 }
 widget.prototype.getPropertiesString = function () {
 	if(this.properties != undefined){
@@ -376,6 +433,7 @@ ioWidget.prototype.onChange = function() {
 }
 
 //slider Widget
+//TODO: upper and lower limit need to be split into x and y for panes
 function sliderWidget (element) {
 	widget.call(this, element);
 	this.properties = {
@@ -408,17 +466,17 @@ sliderWidget.prototype.initialize = function() {
 					break;
 			}
 		},
-		set : function() {
+		set : function(value) {
 			switch(this.properties.orientation){
 				case "horizontal":
-					this.setHorizontal(arguments[0]);
+					this.setHorizontal(value);
 					break;
 				case "vertical":
-					this.setVertical(arguments[0]);
+					this.setVertical(value);
 					break;
 				default:
-					this.setHorizontal(arguments[0]);
-					this.setVertical(arguments[1]);
+					this.setHorizontal(value.x);
+					this.setVertical(value.y);
 					break;
 			}
 		},
@@ -426,8 +484,8 @@ sliderWidget.prototype.initialize = function() {
 		configurable: false 
     });
 };
-sliderWidget.prototype.postInitialize = function(){
-	widget.prototype.postInitialize.call(this);
+sliderWidget.prototype.start = function(){
+	widget.prototype.start.call(this);
 	if(this.properties.orientation == "pane"){
 		this.setHeight();
 	}
@@ -471,7 +529,7 @@ sliderWidget.prototype.getVertical = function() {
 sliderWidget.prototype.setVertical = function(val) {
 	if(this.indicatorRef == undefined){return;}
 	var y = Math.max(Math.min(this.properties.upperLimit, val),this.properties.lowerLimit);
-	y = (y - this.properties.lowerLimit)/this.proerties.upperLimit;
+	y = (y - this.properties.lowerLimit)/this.properties.upperLimit;
 	y = y * (this.element.offsetHeight - this.indicatorRef.offsetHeight);
 	this.indicatorRef.style.top = y + "px";
 }
@@ -592,8 +650,8 @@ ioSliderWidget.prototype.postInitialize = function () {
 		if(this.properties.viewMode != "output"){output.value = slider.value;}
 	} else {
 		var outputX = this.outputX.data, outputY = this.outputY.data;
-		outputX.onUpdate = function () { slider.value = [outputX.value, outputY.value];parent.onUpdate();};
-		outputY.onUpdate = function () { slider.value = [outputX.value, outputY.value];parent.onUpdate();};
+		outputX.onUpdate = function () { slider.value = {x:outputX.value, y:outputY.value};parent.onUpdate();};
+		outputY.onUpdate = function () { slider.value = {x:outputX.value, y:outputY.value};parent.onUpdate();};
 		slider.onUpdate = function () { outputX.value = slider.value.x; outputY.value = slider.value.y;parent.onUpdate();};
 		if(this.properties.viewMode != "output"){
 			outputX.value = slider.value.x;
@@ -667,12 +725,52 @@ ioSliderWidget.prototype.changeViewMode = function (viewmode) {
 	this.properties.viewMode = viewmode;
 }
 
+//TODO: rename to colorWidget. Can be inherited from for palette swatches, etc
 //color swatch widget
+//TODO: add color utilities
 function swatchWidget(element) {
 	widget.call(this, element);
 }
 swatchWidget.prototype = new widget();
 swatchWidget.prototype.constructor = swatchWidget;
+
+//TODO: make a single, configurable multi-slider widget
+function multiSliderWidget(element) {
+	widget.call(this, element);
+}
+multiSliderWidget.prototype = new widget();
+multiSliderWidget.prototype.constructor = multiSliderWidget;
+multiSliderWidget.prototype.configureSelf = function(){
+	//creates the inner html based on our settings
+	//parameters are all of the values that we're going to manipulate
+	//configuration is how those parameters are grouped and displayed as sliders
+	/*
+		parameters:[hue, saturation, value]
+		or
+		parameters:[red, green, blue]
+		or
+		parameters:[hue, saturation, lightness]
+		
+		configuration:[horizontal, pane]
+		also: orientation (sets flex-direction)
+		
+		parameters set output order as well
+	*/
+	var members = [], index = 0;
+	this.configuration.forEach(function(index){
+		members.push({
+			className:"sliderWidget",
+			properties:{
+				orientation:this.parameters[index],
+				type:"class", //let this have a 2-entry array for pane slider widgets
+				upperLimit:0,
+				lowerLimit:1,
+				output:"int"
+			}
+		});
+		
+	});
+}
 
 //rgb widget
 function rgbWidget(element) {
@@ -720,10 +818,10 @@ rgbWidget.prototype.setValues = function(){
 function hsvWidget(element){
 	widget.call(this,element);
 	this.members = [
+		{ className:"ioSliderWidget", name:"satval", properties:{
+			orientation:"pane", type:"satval", upperLimit:100, output:"int"}},
 		{ className:"ioSliderWidget", name:"hue", properties:{
 			orientation:"vertical", type:"hue", upperLimit:360, output:"int"}},
-		{ className:"ioSliderWidget", name:"satval", properties:{
-			orientation:"pane", type:"satval"}},
 		{ className:"swatchWidget", name:"swatch" }
 	];
 	this.color = new PXL();
@@ -743,7 +841,7 @@ hsvWidget.prototype.setHue = function(){
 	this.setColor();
 }
 hsvWidget.prototype.setColor = function(){
-	var color = this.color.HSVtoRGB(this.hue.data.value,this.satval.data.value.x, 1 - this.satval.data.value.y);
+	var color = this.color.HSVtoRGB(this.hue.data.value,this.satval.data.value.x/100, 1 - (this.satval.data.value.y/100));
 	this.swatch.data.element.style.background = "rgb("+color[0]+","+color[1]+","+color[2]+")";
 }
 
