@@ -24,8 +24,8 @@ input::-webkit-inner-spin-button
 {
 	position : relative;
 	display : inline-block;
-	height : 2em;
-	width : 2em;
+	min-height : 2em;
+	min-width : 2em;
 	background-color : rgb(26,26,26);
 	border-radius : 0.5em;
 	flex:1 1 100%;
@@ -36,6 +36,18 @@ input::-webkit-inner-spin-button
 {
 	display:flex;
 }
+.multiSliderWidget
+{
+	display:flex;
+}
+.multiSliderWidghet.orientation-horizontal
+{
+	flex-direction:row;
+}
+.multiSliderWidget.orientation-vertical
+{
+	flex-direction:column;
+}
 .ioSliderWidget.orientation-pane
 {
 	flex-wrap:wrap;
@@ -45,6 +57,7 @@ input::-webkit-inner-spin-button
 .sliderWidget.orientation-vertical
 {
 	height:auto;
+	max-width:2em;
 }
 
 .ioSliderWidget.orientation-vertical
@@ -102,7 +115,7 @@ input::-webkit-inner-spin-button
 }
 .sliderIndicator.orientation-horizontal
 {
-	top : -0.25em;
+	top : -0.4em;
 }
 .sliderIndicator.orientation-vertical
 {

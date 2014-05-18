@@ -229,7 +229,6 @@ var Application = {
 //base abstract class to base all widgets on
 //TODO: remove unneccessary markup (data-class, data-properties, etc) after initialization)
 //TODO: break out some properties to 'settings'
-//TODO: make the initializer abstract wrt properties, attributes, etc
 //settings are mutable and can be stored in a profile. Properties are not
 function widget(element) {
 	this.element = element;
@@ -400,6 +399,19 @@ widget.prototype.animate = function (property, value, time, callback){
 	this.element.style[property] = value;
 }
 
+//base abstract class to contain multiple widgets
+function containerWidget(element){
+	widget.call(this, element);
+}
+containerWidget.prototype = new widget();
+containerWidget.prototype.constructor = containerWidget;
+containerWidget.prototype.initialize = function(){
+	widget.prototype.initialize.call(this);
+	//spawn members and initialize them
+}
+containerWidget.prototype.configureSelf = function() {
+	
+}
 //input/output widget
 function ioWidget (element) {
 	widget.call(this, element);
@@ -745,11 +757,15 @@ swatchWidget.prototype = new widget();
 swatchWidget.prototype.constructor = swatchWidget;
 
 //TODO: make a single, configurable multi-slider widget
+//TODO: this should inherit from containerWidget
 function multiSliderWidget(element) {
 	widget.call(this, element);
 }
 multiSliderWidget.prototype = new widget();
 multiSliderWidget.prototype.constructor = multiSliderWidget;
+multiSliderWidget.prototype.postInitialize = function() {
+	this.configureSelf();
+}
 multiSliderWidget.prototype.knownTypes = {
 	hue:{upperLimit:360,output:"int"},
 	saturation:{upperLimit:100,output:"int"},
@@ -763,33 +779,43 @@ multiSliderWidget.prototype.configureSelf = function(){
 	//creates the inner html based on our settings
 	//parameters are all of the values that we're going to manipulate
 	//configuration is how those parameters are grouped and displayed as sliders
-	/*
-		parameters:[hue, saturation, value]
-		or
-		parameters:[red, green, blue]
-		or
-		parameters:[hue, saturation, lightness]
-		
-		configuration:[horizontal, pane]
-		also: orientation (sets flex-direction)
-		
-		parameters set output order as well
-	*/
-	var members = [], pIndex = 0;
-	this.configuration.forEach(function(index){
+	var parent = this, members = [], pIndex = 0;
+	//add the sliders
+	parent.configuration && parent.configuration.forEach(function(thisConfig){
 		//build the object
-		var thisMember = {className:"sliderWidget",properties:{orientation:this.configuration[index]}};
-		if(thisMember.properties.orientation != "pane"){
-			thisMember.properties.type = {x:this.parameters[pIndex],y:this.parameters[++pIndex]};
+		var thisMember = {className:"sliderWidget",properties:{orientation:thisConfig}};
+		if(thisMember.properties.orientation == "pane"){
+			thisMember.properties.type = {x:parent.parameters[pIndex],y:parent.parameters[++pIndex]};
+			if(parent.knownTypes[thisMember.properties.type.x] != undefined){
+				for(var key in parent.knownTypes[thisMember.properties.type.x]){
+					thisMember.properties[key+"X"] = parent.knownTypes[thisMember.properties.type.x][key];
+				}
+			}if(parent.knownTypes[thisMember.properties.type.y] != undefined){
+				for(var key in parent.knownTypes[thisMember.properties.type.y]){
+					thisMember.properties[key+"Y"] = parent.knownTypes[thisMember.properties.type.y][key];
+				}
+			}
+			
 		} else {
-			thisMember.properties.type = this.parameters[pIndex];
-			if(this.knownTypes[thisMember.properties.type] != undefined){
-				this.knownTypes[thisMember.properties.type].forEach(function(key, value){
-					thisMember.properties[key] = value;
-				});
+			thisMember.properties.type = parent.parameters[pIndex];
+			if(parent.knownTypes[thisMember.properties.type] != undefined){
+				for(var key in parent.knownTypes[thisMember.properties.type]){
+					thisMember.properties[key] = parent.knownTypes[thisMember.properties.type][key];
+				}
 			}
 		}
+		pIndex++;
+		members.push(thisMember);
 	});
+	//add our outputs
+	parent.parameters && parent.parameters.forEach(function(thisParam){
+		var thisOutput = {className:"ioWidget", tag:"input"};
+		members.push(thisOutput);
+	});
+	parent.members = members;
+	parent.initialize();
+	Application.initializeClasses(parent.element.children);
+	
 }
 
 //rgb widget
