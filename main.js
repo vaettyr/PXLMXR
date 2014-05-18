@@ -433,7 +433,6 @@ ioWidget.prototype.onChange = function() {
 }
 
 //slider Widget
-//TODO: upper and lower limit need to be split into x and y for panes
 function sliderWidget (element) {
 	widget.call(this, element);
 	this.properties = {
@@ -452,6 +451,7 @@ sliderWidget.prototype.initialize = function() {
 	this.element.addEventListener("mousedown",this.onMouseDown);
 	//hook up mobile touch event
 	this.element.addEventListener("touchstart", this.onMouseDown);
+	//orientation settings
 	Object.defineProperty(this,"value",{
 		get: function() {
 			switch(this.properties.orientation){
@@ -497,24 +497,26 @@ sliderWidget.prototype.setHeight = function(val){
 		this.element.style.height = this.element.offsetWidth + "px";
 	}
 }
-sliderWidget.prototype.checkValue = function(value){
-	if(this.properties.output == "int"){
-		return Math.round(value);
-	}
-	return value;
-}
 sliderWidget.prototype.getHorizontal = function() {
 	if(this.indicatorRef == undefined){return;}
 	var x = this.indicatorRef.style.left; 
 	x = x.slice(0,x.length-2); //remove 'px' and cast to number
 	x = x / (this.element.offsetWidth - this.indicatorRef.offsetWidth);
-	x = (this.properties.lowerLimit * (1 - x)) + (this.properties.upperLimit * x);
-	return this.checkValue(x);
+	//get limits
+	var lowerLimit = (this.properties.lowerLimitX != undefined)?this.properties.lowerLimitX:this.properties.lowerLimit,
+	upperLimit = (this.properties.upperLimitX != undefined)?this.properties.upperLimitX:this.properties.upperLimit;
+	x = (lowerLimit * (1 - x)) + (upperLimit * x);
+	if(this.properties.orientation != "pane" && this.properties.output == "int"){x = Math.round(x);}
+	if(this.properties.orientation == "pane" && this.properties.outputX == "int"){x = Math.round(x);}
+	return x;
 }
 sliderWidget.prototype.setHorizontal = function(val) {
 	if(this.indicatorRef == undefined){return;}
-	var x = Math.max(Math.min(this.properties.upperLimit, val),this.properties.lowerLimit);
-	x = (x - this.properties.lowerLimit)/this.properties.upperLimit;
+	//get limits
+	var lowerLimit = (this.properties.lowerLimitX != undefined)?this.properties.lowerLimitX:this.properties.lowerLimit,
+	upperLimit = (this.properties.upperLimitX != undefined)?this.properties.upperLimitX:this.properties.upperLimit,
+	x = Math.max(Math.min(upperLimit, val),lowerLimit);
+	x = (x - lowerLimit)/upperLimit;
 	x = x * (this.element.offsetWidth - this.indicatorRef.offsetWidth);
 	this.indicatorRef.style.left = x + "px";
 }
@@ -523,12 +525,20 @@ sliderWidget.prototype.getVertical = function() {
 	var y = this.indicatorRef.style.top;
 	y = y.slice(0,y.length-2); //remove 'px' and cast to number
 	y = y / (this.element.offsetHeight - this.indicatorRef.offsetHeight);
+	//get limits
+	var lowerLimit = (this.properties.lowerLimitY != undefined)?this.properties.lowerLimitY:this.properties.lowerLimit,
+	upperLimit = (this.properties.upperLimitY != undefined)?this.properties.upperLimitY:this.properties.upperLimit;
 	y = (this.properties.lowerLimit * (1 - y)) + (this.properties.upperLimit * y);
-	return this.checkValue(y);
+	if(this.properties.orientation != "pane" && this.properties.output == "int"){y = Math.round(y);}
+	if(this.properties.orientation == "pane" && this.properties.outputY == "int"){y = Math.round(y);}
+	return y;
 }
 sliderWidget.prototype.setVertical = function(val) {
 	if(this.indicatorRef == undefined){return;}
-	var y = Math.max(Math.min(this.properties.upperLimit, val),this.properties.lowerLimit);
+	//get limits
+	var lowerLimit = (this.properties.lowerLimitY != undefined)?this.properties.lowerLimitY:this.properties.lowerLimit,
+	upperLimit = (this.properties.upperLimitY != undefined)?this.properties.upperLimitY:this.properties.upperLimit,
+	y = Math.max(Math.min(this.properties.upperLimit, val),this.properties.lowerLimit);
 	y = (y - this.properties.lowerLimit)/this.properties.upperLimit;
 	y = y * (this.element.offsetHeight - this.indicatorRef.offsetHeight);
 	this.indicatorRef.style.top = y + "px";
@@ -740,6 +750,15 @@ function multiSliderWidget(element) {
 }
 multiSliderWidget.prototype = new widget();
 multiSliderWidget.prototype.constructor = multiSliderWidget;
+multiSliderWidget.prototype.knownTypes = {
+	hue:{upperLimit:360,output:"int"},
+	saturation:{upperLimit:100,output:"int"},
+	value:{upperLimit:100,output:"int"},
+	lightness:{upperLimit:100,output:"int"},
+	red:{upperLimit:255,output:"int"},
+	green:{upperLimit:255,output:"int"},
+	blue:{upperLimit:255,output:"int"}
+};
 multiSliderWidget.prototype.configureSelf = function(){
 	//creates the inner html based on our settings
 	//parameters are all of the values that we're going to manipulate
@@ -756,19 +775,20 @@ multiSliderWidget.prototype.configureSelf = function(){
 		
 		parameters set output order as well
 	*/
-	var members = [], index = 0;
+	var members = [], pIndex = 0;
 	this.configuration.forEach(function(index){
-		members.push({
-			className:"sliderWidget",
-			properties:{
-				orientation:this.parameters[index],
-				type:"class", //let this have a 2-entry array for pane slider widgets
-				upperLimit:0,
-				lowerLimit:1,
-				output:"int"
+		//build the object
+		var thisMember = {className:"sliderWidget",properties:{orientation:this.configuration[index]}};
+		if(thisMember.properties.orientation != "pane"){
+			thisMember.properties.type = {x:this.parameters[pIndex],y:this.parameters[++pIndex]};
+		} else {
+			thisMember.properties.type = this.parameters[pIndex];
+			if(this.knownTypes[thisMember.properties.type] != undefined){
+				this.knownTypes[thisMember.properties.type].forEach(function(key, value){
+					thisMember.properties[key] = value;
+				});
 			}
-		});
-		
+		}
 	});
 }
 
