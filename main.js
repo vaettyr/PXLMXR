@@ -174,6 +174,13 @@ function PXLmap (){
 //TODO: add support for compound selectors (csv)
 var Application = {
 	initialize: function(elementList){
+		/*
+		document.addEventListener("contextmenu", function(event){
+			event.preventDefault();
+			event.stopPropagation();
+			return false;
+		});
+		*/
 		this.classes = [];
 		for(var styleSheet in document.styleSheets){
 			for(var rule in document.styleSheets[styleSheet].rules){
@@ -227,9 +234,6 @@ var Application = {
 };
 
 //base abstract class to base all widgets on
-//TODO: remove unneccessary markup (data-class, data-properties, etc) after initialization)
-//TODO: break out some properties to 'settings'
-//settings are mutable and can be stored in a profile. Properties are not
 function widget(element) {
 	this.element = element;
 };
@@ -267,9 +271,29 @@ widget.prototype.initialize = function(){
 		var html = "";
 		for(var i=0;i<this.members.length;i++){
 			var thisMember = this.members[i];
+			//add an optional label
+			if(thisMember.label != undefined){
+				html += "<label>"+thisMember.label+"</label>";
+			}
 			var tag = (thisMember.tag == undefined)?"div":thisMember.tag;
 			html += "<"+tag+" data-class='"+thisMember.className+"'";
 			//add class properties
+			//we need to inherit parent properties and settings, but nothing else
+			thisMember.properties = (thisMember.properties)?thisMember.properties:{};
+			for(var key in this.properties){
+				thisMember.properties[key] = (thisMember.properties[key])?thisMember.properties[key]:this.properties[key];
+			}
+			thisMember.settings = (thisMember.settings||this.settings)?(thisMember.settings)?thisMember.settings:{}:undefined;
+			for(var key in this.settings){
+				thisMember.settings[key] = (thisMember.settings[key])?thisMember.settings[key]:this.settings[key];
+			}
+			for(var attribute in thisMember){
+				if(attribute != "tag" && attribute != "className" && attribute != "attributes" && thisMember[attribute]){
+					html += "data-"+attribute+"='";
+					html += this.toHTML(thisMember[attribute])+"'";
+				}
+			}
+			/*
 			if(thisMember.properties != undefined || this.properties != undefined){
 				//build a master list of properties, including overridden properties
 				var theseProperties = (this.properties == undefined)?{}:this.properties;
@@ -285,6 +309,7 @@ widget.prototype.initialize = function(){
 				htmlProperties += "'";
 				html += htmlProperties;
 			}
+			*/
 			//add tag attributes
 			if(thisMember.attributes != undefined){
 				for(var key in thisMember.attributes){
@@ -310,7 +335,9 @@ widget.prototype.parseHTML = function(html){
 			element = element.trim().split(";");
 			for(var index in element){
 				var pair = element[index].split(":");
-				thisValue[pair[0]] = pair[1];
+				if(pair[0] != ""){
+					thisValue[pair[0]] = pair[1];
+				}
 			}
 		} else if(element.trim().indexOf(" ") >= 0){
 			//array
@@ -334,11 +361,50 @@ widget.prototype.parseHTML = function(html){
 }
 widget.prototype.toHTML = function(element){
 	//takes an object (probably from this.members) and formats it as an html element
+	var html = "";
+	//can output arrays, strings, objects
+	var toInnerHTML = function(elem){
+		var thisHTML = "";
+		if(elem instanceof Object){
+			for(var key in elem){
+				thisHTML += key+":"+elem[key]+";";
+			}
+		} else if (elem instanceof Array){
+			elem.forEach(function(value, index){
+				if(index>0){thisHTML += " ";}
+				thisHTML += value;
+			});
+		} else {
+			thisHTML += elem;
+		}
+		return thisHTML;
+	}
+	if(element instanceof Array){
+		element.forEach(function(value, index){
+			if(index>0){html += ",";}
+			html += toInnerHTML(value);
+		});
+	} else {
+		html = toInnerHTML(element);
+	}
+	return html;
 }
 widget.prototype.postInitialize = function(){
+	for(var index in this.element.attributes){
+		var thisName = this.element.attributes[index].name;
+		if(thisName && thisName.match(/^data-(?!class)/i)){
+			this.element.removeAttribute(this.element.attributes[index].name);
+		}
+	}
 	//placeholder function that is called when all of a widget's members have been initialized
 }
 widget.prototype.start = function(){
+	for(var index in this.element.attributes){
+		var thisName = this.element.attributes[index].name;
+		if(thisName && thisName.match(/^data-(?!class)/i)){
+			this.element.removeAttribute(this.element.attributes[index].name);
+		}
+	}
 	//placeholder function that is called when the entire application is initialized
 }
 widget.prototype.getPropertiesString = function () {
@@ -400,6 +466,7 @@ widget.prototype.animate = function (property, value, time, callback){
 }
 
 //base abstract class to contain multiple widgets
+//unneccessary? not currently being used
 function containerWidget(element){
 	widget.call(this, element);
 }
@@ -412,6 +479,7 @@ containerWidget.prototype.initialize = function(){
 containerWidget.prototype.configureSelf = function() {
 	
 }
+
 //input/output widget
 function ioWidget (element) {
 	widget.call(this, element);
@@ -441,7 +509,7 @@ ioWidget.prototype.onChange = function() {
 		}
 		parent.element.value = value;
 	}
-	parent.onUpdate.call(this);
+	parent.onUpdate && parent.onUpdate.call(this);
 }
 
 //slider Widget
@@ -505,8 +573,10 @@ sliderWidget.prototype.start = function(){
 sliderWidget.prototype.setHeight = function(val){
 	if(val != undefined){
 		this.element.style.height = val + "px";
+		this.element.style["min-height"] = val + "px";
 	} else {
 		this.element.style.height = this.element.offsetWidth + "px";
+		this.element.style["min-height"] = this.element.offsetWidth + "px";
 	}
 }
 sliderWidget.prototype.getHorizontal = function() {
@@ -540,7 +610,7 @@ sliderWidget.prototype.getVertical = function() {
 	//get limits
 	var lowerLimit = (this.properties.lowerLimitY != undefined)?this.properties.lowerLimitY:this.properties.lowerLimit,
 	upperLimit = (this.properties.upperLimitY != undefined)?this.properties.upperLimitY:this.properties.upperLimit;
-	y = (this.properties.lowerLimit * (1 - y)) + (this.properties.upperLimit * y);
+	y = (lowerLimit * (1 - y)) + (upperLimit * y);
 	if(this.properties.orientation != "pane" && this.properties.output == "int"){y = Math.round(y);}
 	if(this.properties.orientation == "pane" && this.properties.outputY == "int"){y = Math.round(y);}
 	return y;
@@ -572,6 +642,7 @@ sliderWidget.prototype.setSliderPosition = function (pageX, pageY) {
 	if(this.onUpdate != undefined){this.onUpdate(this);}
 }
 sliderWidget.prototype.onMouseDown = function (event) {
+	if(event.button != 0){return;}
 	//bind the other mouse events.
 	document.addEventListener("mousemove", this.data.onMouseMove);
 	document.addEventListener("mouseup", this.data.onMouseUp);
@@ -605,6 +676,7 @@ sliderIndicator.prototype.constructor = sliderIndicator;
 
 //ioSlider widget
 //TODO: re-work changeViewMode function
+//or, REMOVE
 function ioSliderWidget(element) {
 	widget.call(this,element);
 	this.properties = { 
@@ -758,12 +830,14 @@ swatchWidget.prototype.constructor = swatchWidget;
 
 //TODO: make a single, configurable multi-slider widget
 //TODO: this should inherit from containerWidget
+//TODO: this should be able to initialize at a particular value set
 function multiSliderWidget(element) {
 	widget.call(this, element);
 }
 multiSliderWidget.prototype = new widget();
 multiSliderWidget.prototype.constructor = multiSliderWidget;
 multiSliderWidget.prototype.postInitialize = function() {
+	widget.prototype.postInitialize.call(this);
 	this.configureSelf();
 }
 multiSliderWidget.prototype.knownTypes = {
@@ -795,7 +869,8 @@ multiSliderWidget.prototype.configureSelf = function(){
 					thisMember.properties[key+"Y"] = parent.knownTypes[thisMember.properties.type.y][key];
 				}
 			}
-			
+			//condense to a single string
+			thisMember.properties.type = thisMember.properties.type.x+"-"+thisMember.properties.type.y;
 		} else {
 			thisMember.properties.type = parent.parameters[pIndex];
 			if(parent.knownTypes[thisMember.properties.type] != undefined){
@@ -808,14 +883,158 @@ multiSliderWidget.prototype.configureSelf = function(){
 		members.push(thisMember);
 	});
 	//add our outputs
-	parent.parameters && parent.parameters.forEach(function(thisParam){
-		var thisOutput = {className:"ioWidget", tag:"input"};
-		members.push(thisOutput);
-	});
+	if(parent.parameters){
+		var outputMember = {className:"widget", members:[]};
+		switch(this.properties.orientation){
+			case "horizontal":
+				outputMember.properties = {orientation:"vertical"};
+				break;
+			case "vertical":
+				outputMember.properties = {orientation:"horizontal"};
+				break;
+		}
+		parent.parameters.forEach(function(thisParam){
+			var thisOutput = {className:"ioWidget", tag:"input", label:thisParam};
+			outputMember.members.push(thisOutput);
+		});
+		members.push(outputMember);
+	}
 	parent.members = members;
 	parent.initialize();
 	Application.initializeClasses(parent.element.children);
-	
+	//hook up output to sliders and sliders to output
+	pIndex = 0, output = parent.element.children[parent.element.children.length-1], outputs = output.querySelectorAll("input");
+	parent.configuration.forEach(function(value, index){
+		var thisSlider = parent.element.children[index].data,
+		thisOutput = outputs[pIndex].data;
+		if(value == "pane"){
+			var thisOtherOutput = outputs[++pIndex].data;
+			thisSlider.onUpdate = function(){
+				thisOutput.value = this.value.x;
+				thisOtherOutput.value = this.value.y;
+			}
+			thisOutput.onUpdate = function(){
+				thisSlider.value = {x:this.value, y:thisSlider.value.y};
+			}
+			thisOtherOutput.onUpdate = function(){
+				thisSlider.value = {x:thisSlider.value.x, y:this.value};
+			}
+			thisSlider.start();
+		} else {
+			thisSlider.onUpdate = function(){
+				thisOutput.value = this.value;
+			};
+			thisOutput.onUpdate = function(){
+				thisSlider.value = this.value;
+			};
+		}
+		pIndex++;
+	});
+	parent.element.addEventListener("mousedown", parent.onRightClick);
+}
+multiSliderWidget.prototype.onRightClick = function(event){
+	if(event.button != 2){return;}
+	event.preventDefault();
+	event.stopPropagation();
+	this.data.showConfig();
+}
+multiSliderWidget.prototype.showConfig = function(){
+	//things we can edit (about sliders)
+	//orientation (overall)
+	//invert axis?
+	var parent = this, sliders = parent.element.querySelectorAll("[data-class=sliderWidget]");
+	var addButton = function(htmlClass, onPress, element){
+		var thisButton = document.createElement("button");
+		thisButton.classList.add(htmlClass);
+		thisButton.addEventListener("click", onPress);
+		element.insertBefore(thisButton, element.children[element.children.length]);
+	}
+	var configOverlay = document.createElement("div");
+	configOverlay.classList.add("multiOverlay");
+	parent.element.insertBefore(configOverlay, parent.element.children[0]);
+	configOverlay.addEventListener("mousedown",function(e){e.stopPropagation();e.preventDefault();parent.configureSelf();return false;});
+	this.configuration.forEach(function(value, index){
+		//get the associated slider
+		thisSlider = sliders[index].data;
+		var newElement = document.createElement("div");
+		newElement.classList.add("overlay");
+		thisSlider.element.insertBefore(newElement, thisSlider.element.children[0]);
+		newElement.addEventListener("mousedown",function(e){e.preventDefault();e.stopPropagation();if(e.button == 2){parent.configureSelf();}return false;});
+		//build the necessary config buttons for this element
+		if(thisSlider.properties.orientation == "pane"){
+			addButton("split", function(e){parent.split(index);console.log("pressed split");}, newElement); //split into separate sliders
+			addButton("swap", function(e){console.log("pressed swap");}, newElement); // swap axes
+		} else {
+			if(index>0 && sliders[index-1].data.properties.orientation != "pane"){addButton("comPrev", function(e){parent.combine(index,-1);console.log("pressed combine previous");}, newElement);} //combine prev
+			if(index < parent.configuration.length-1 && sliders[index+1].data.properties.orientation != "pane"){addButton("comNext", function(e){parent.combine(index,1);console.log("pressed combine next");}, newElement);}//combine next
+		}
+		if(index>0){addButton("movePrev", function(e){parent.move(index, -1);}, newElement);} //move prev
+		if(index < parent.configuration.length-1){addButton("moveNext", function(e){parent.move(index, 1);}, newElement);}//move next
+			});
+}
+multiSliderWidget.prototype.move = function(index, direction){
+	//package everything up into objects
+	var totalConfig = [], pIndex = 0, parent = this;
+	this.configuration.forEach(function(value, index){
+		var thisConfig = {orientation:value};
+		if(value=="pane"){thisConfig.type = [parent.parameters[pIndex],parent.parameters[++pIndex]];}else{thisConfig.type = [parent.parameters[pIndex]];}
+		totalConfig.push(thisConfig);
+		pIndex++;
+	});
+	//sort the objects
+	totalConfig[index] = totalConfig.splice(index+direction, 1, totalConfig[index])[0];
+	//unpack them
+	var config = [], params = [], pIndex = 0;
+	totalConfig.forEach(function(value, index){
+		config.push(value.orientation);
+		value.type.forEach(function(type){
+			params.push(type);
+		});
+	});
+	this.configuration = config;
+	this.parameters = params;
+	this.configureSelf();
+	this.showConfig();
+}
+multiSliderWidget.prototype.combine = function(index, direction){
+	//package everything up into objects
+	var totalConfig = [], pIndex = 0, parent = this;
+	this.configuration.forEach(function(value, index){
+		var thisConfig = {orientation:value};
+		if(value=="pane"){thisConfig.type = [parent.parameters[pIndex],parent.parameters[++pIndex]];}else{thisConfig.type = [parent.parameters[pIndex]];}
+		totalConfig.push(thisConfig);
+		pIndex++;
+	});
+	//combine the two targets
+	totalConfig.splice((direction>0)?index:index+direction,2,{orientation:"pane",type:[totalConfig[index].type[0],totalConfig[index+direction].type[0]]});
+	//unpack them
+	var config = [], params = [], pIndex = 0;
+	totalConfig.forEach(function(value, index){
+		config.push(value.orientation);
+		value.type.forEach(function(type){
+			params.push(type);
+		});
+	});
+	this.configuration = config;
+	this.parameters = params;
+	this.configureSelf();
+	this.showConfig();
+}
+multiSliderWidget.prototype.split = function(index){
+	//package everything up into objects
+	var totalConfig = [], pIndex = 0, parent = this;
+	this.configuration.forEach(function(value, index){
+		var thisConfig = {orientation:value};
+		if(value=="pane"){thisConfig.type = [parent.parameters[pIndex],parent.parameters[++pIndex]];}else{thisConfig.type = [parent.parameters[pIndex]];}
+		totalConfig.push(thisConfig);
+		pIndex++;
+	});
+	//split the config
+	var thisOrientation = (this.properties.orientation == "horizontal")?"vertical":"horizontal";
+	this.configuration.splice(index,1, thisOrientation, thisOrientation);
+	//rebuild
+	this.configureSelf();
+	this.showConfig();
 }
 
 //rgb widget
