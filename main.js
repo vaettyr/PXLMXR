@@ -407,6 +407,10 @@ widget.prototype.start = function(){
 	}
 	//placeholder function that is called when the entire application is initialized
 }
+widget.prototype.onUpdate = function(){
+	var parent = this.element.parentNode.data;
+	parent && parent.onUpdate && parent.onUpdate.call(this);
+}
 widget.prototype.getPropertiesString = function () {
 	if(this.properties != undefined){
 		var propertiesString = "";
@@ -874,7 +878,6 @@ multiSliderWidget.prototype.initialize = function(){
 			parent = this,
 			values = [];
 			for(var thisOutput in outputs){
-			//outputs.forEach(function(thisOutput){
 				if(outputs[thisOutput].data != undefined){
 					values.push(outputs[thisOutput].data.value);
 				}
@@ -1024,30 +1027,38 @@ multiSliderWidget.prototype.configureSelf = function(){
 			thisSlider.onUpdate = function(){
 				thisOutput.value = this.value.x;
 				thisOtherOutput.value = this.value.y;
+				var parent = this.element.parentNode;
+				parent && parent.data && parent.data.onUpdate();
 			}
 			thisOutput.onUpdate = function(){
 				thisSlider.value = {x:this.value, y:thisSlider.value.y};
+				var parent = this.parentNode;
+				parent && parent.data && parent.data.onUpdate();
 			}
 			thisOtherOutput.onUpdate = function(){
 				thisSlider.value = {x:thisSlider.value.x, y:this.value};
+				var parent = this.parentNode;
+				parent && parent.data && parent.data.onUpdate();
 			}
 			thisSlider.start();
 		} else {
 			thisSlider.onUpdate = function(){
 				thisOutput.value = this.value;
+				var parent = this.element.parentNode;
+				parent && parent.data && parent.data.onUpdate();
 			};
 			thisOutput.onUpdate = function(){
 				thisSlider.value = this.value;
+				var parent = this.parentNode;
+				parent && parent.data && parent.data.onUpdate();
 			};
 		}
 		pIndex++;
 	});
 	parent.setValues();
-	parent.element.addEventListener("mousedown", parent.onRightClick, false);
+	parent.element.addEventListener("mousedown", parent.onClick, false);
 }
-multiSliderWidget.prototype.onRightClick = function(event){
-	event.preventDefault();
-	event.stopPropagation();
+multiSliderWidget.prototype.onClick = function(event){
 	//maybe add a left-click while active to bring up the multi-widget config options
 	switch(event.button){
 		case 0:
@@ -1059,10 +1070,14 @@ multiSliderWidget.prototype.onRightClick = function(event){
 					{
 						if(event.target && event.target.tagName != "BUTTON"){
 							overlay.style.cssText = null;
+							event.preventDefault();
+							event.stopPropagation();
 						}
 					} else {
 						overlay.style['z-index'] = 5000;
 						overlay.style.background = "rgba(75, 120, 150, 0.8)";
+						event.preventDefault();
+						event.stopPropagation();
 					}
 				}
 			}
@@ -1071,8 +1086,12 @@ multiSliderWidget.prototype.onRightClick = function(event){
 			this.data.configOn = !this.data.configOn;
 			if(this.data.configOn){
 				this.data.showConfig();
+				event.preventDefault();
+				event.stopPropagation();
 			} else {
 				this.data.configureSelf();
+				event.preventDefault();
+				event.stopPropagation();
 			}
 			break;
 	}
@@ -1211,17 +1230,43 @@ function rgbWidget(element){
 	this.parameters = ["red", "green", "blue"];
 	this.configuration = ["horizontal", "horizontal", "horizontal"];
 	this.properties.orientation = "vertical";
+	this.color = new PXL();
 }
 rgbWidget.prototype = new multiSliderWidget();
 rgbWidget.prototype.constructor = rgbWidget;
+rgbWidget.prototype.onUpdate = function(){
+	//console.log("rgb widget update");
+}
 
 function hsvWidget(element){
 	multiSliderWidget.call(this, element);
 	this.parameters = ["hue", "saturation", "value"];
 	this.configuration = ["vertical", "pane"];
+	this.color = new PXL();
 }
 hsvWidget.prototype = new multiSliderWidget();
 hsvWidget.prototype.constructor = hsvWidget;
+hsvWidget.prototype.onUpdate = function(){
+	var satSlider = this.element.querySelector(".type-saturation");
+	if(satSlider != null){
+		var hue = this.value[this.parameters.indexOf("hue")];
+		hue = this.color.HSVtoRGB(hue, 1, 1);
+		satSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
+	}
+	var valSlider = this.element.querySelector(".type-value");
+	if(valSlider != null){
+		var hue = this.value[this.parameters.indexOf("hue")];
+		var sat = this.value[this.parameters.indexOf("saturation")];
+		hue = this.color.HSVtoRGB(hue, sat/100, 1);
+		valSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
+	}
+	var satvalSlider = this.element.querySelector(".type-saturation-value, .type-value-saturation");
+	if(satvalSlider != null){
+		var hue = this.value[this.parameters.indexOf("hue")];
+		hue = this.color.HSVtoRGB(hue, 1, 1);
+		satvalSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
+	}
+}
 
 function hslWidget(element){
 	multiSliderWidget.call(this, element);
