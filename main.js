@@ -124,6 +124,7 @@ PXL.prototype.HSVtoRGB = function(h,s,v){
 	return color;	
 }
 
+//NOTE: think about dithering and bit depth
 function PXLmap (){
 	this.pxls = [];
 	this.width = 0;
@@ -234,6 +235,7 @@ var Application = {
 };
 
 //base abstract class to base all widgets on
+//TODO: pull settings out of base widget
 function widget(element) {
 	this.element = element;
 };
@@ -278,38 +280,17 @@ widget.prototype.initialize = function(){
 			var tag = (thisMember.tag == undefined)?"div":thisMember.tag;
 			html += "<"+tag+" data-class='"+thisMember.className+"'";
 			//add class properties
-			//we need to inherit parent properties and settings, but nothing else
+			//we need to inherit parent properties, but nothing else
 			thisMember.properties = (thisMember.properties)?thisMember.properties:{};
 			for(var key in this.properties){
 				thisMember.properties[key] = (thisMember.properties[key])?thisMember.properties[key]:this.properties[key];
 			}
-			thisMember.settings = (thisMember.settings||this.settings)?(thisMember.settings)?thisMember.settings:{}:undefined;
-			for(var key in this.settings){
-				thisMember.settings[key] = (thisMember.settings[key])?thisMember.settings[key]:this.settings[key];
-			}
 			for(var attribute in thisMember){
-				if(attribute != "tag" && attribute != "className" && attribute != "attributes" && thisMember[attribute]){
+				if(attribute != "tag" && attribute != "className" && attribute != "attributes" && attribute != "settings" && thisMember[attribute]){
 					html += "data-"+attribute+"='";
 					html += this.toHTML(thisMember[attribute])+"'";
 				}
 			}
-			/*
-			if(thisMember.properties != undefined || this.properties != undefined){
-				//build a master list of properties, including overridden properties
-				var theseProperties = (this.properties == undefined)?{}:this.properties;
-				for(var key in thisMember.properties){
-					theseProperties[key] = thisMember.properties[key];
-				}
-				html += " data-properties='";
-				var htmlProperties = "";	
-				for(var key in theseProperties){
-					if (htmlProperties.length > 0){htmlProperties +=";";}
-					htmlProperties += key + ":" + theseProperties[key];
-				}
-				htmlProperties += "'";
-				html += htmlProperties;
-			}
-			*/
 			//add tag attributes
 			if(thisMember.attributes != undefined){
 				for(var key in thisMember.attributes){
@@ -367,7 +348,11 @@ widget.prototype.toHTML = function(element){
 		var thisHTML = "";
 		if(elem instanceof Object){
 			for(var key in elem){
-				thisHTML += key+":"+elem[key]+";";
+				if(elem[key] instanceof Array){
+					thisHTML += key+":"+toInnerHTML(elem[key])+";";
+				} else {
+					thisHTML += key+":"+elem[key]+";";
+				}
 			}
 		} else if (elem instanceof Array){
 			elem.forEach(function(value, index){
@@ -469,21 +454,58 @@ widget.prototype.animate = function (property, value, time, callback){
 	this.element.style[property] = value;
 }
 
-//base abstract class to contain multiple widgets
-//unneccessary? not currently being used
-function containerWidget(element){
+//base abstract class to base widgets that can be configured and have saved settings
+function configWidget(element){
 	widget.call(this, element);
+	this.settings = {};
 }
-containerWidget.prototype = new widget();
-containerWidget.prototype.constructor = containerWidget;
-containerWidget.prototype.initialize = function(){
+configWidget.prototype = new widget();
+configWidget.prototype.constructor = configWidget;
+configWidget.prototype.initialize = function(){
+	// get settings
+	var thisSettings = this.getSettings();
+	if(thisSettings){
+		//load these over-top of any default settings
+		for(var setting in thisSettings){
+			this.settings[setting] = thisSettings[setting];
+		}
+	}
+	// push settings to properties ?
 	widget.prototype.initialize.call(this);
 	//spawn members and initialize them
 }
-containerWidget.prototype.configureSelf = function() {
-	
+configWidget.prototype.configureSelf = function() {
+	//this is effectively a re-initialization after certain properties and members have been altered
 }
-
+configWidget.prototype.showConfig = function(){
+	//displays any default configuration options
+}
+configWidget.prototype.getSettings = function(){
+	var thisConstructor = this.constructor.name,
+	thisSettings = window.localStorage.getItem(thisConstructor);
+	if(thisSettings && thisSettings != ""){
+		return JSON.parse(thisSettings);
+	}
+	return false;
+}
+configWidget.prototype.saveSettings = function(){
+	var thisConstructor = this.constructor.name,
+	thisSettings = this.settings;
+	if(thisSettings && thisSettings instanceof Object && Object.keys(thisSettings).length>0){
+		window.localStorage.setItem(thisConstructor, JSON.stringify(thisSettings));
+		return true;
+	}
+	return false;
+}
+configWidget.prototype.loadSettings = function(){
+	if(this.settings && this.settings instanceof Object){
+		for(var setting in this.settings){
+			this.properties[setting] = this.settings[setting];
+		}
+		return true;
+	}
+	return false;
+}
 //input/output widget
 function ioWidget (element) {
 	widget.call(this, element);
@@ -857,9 +879,8 @@ function swatchWidget(element) {
 swatchWidget.prototype = new widget();
 swatchWidget.prototype.constructor = swatchWidget;
 
-//TODO: make a single, configurable multi-slider widget
-//TODO: this should inherit from containerWidget or config widget. All of the overlay and setconfig options could be teased out
-//TODO: add support for saving and loading mutable settings
+//TODO: move more functionality into configWidget
+//TODO: move known types to inherited versions
 //TODO: add support for object in/out for value (using parameter names directly)
 //TODO: write output widget first and add style:order attribute to control its position in flow
 //TODO: hide/show output/slider?
@@ -868,10 +889,10 @@ function multiSliderWidget(element) {
 	this.configOn = false;
 	this.properties = {orientation:"horizontal"};
 }
-multiSliderWidget.prototype = new widget();
+multiSliderWidget.prototype = new configWidget();
 multiSliderWidget.prototype.constructor = multiSliderWidget;
 multiSliderWidget.prototype.initialize = function(){
-	widget.prototype.initialize.call(this);
+	configWidget.prototype.initialize.call(this);
 	Object.defineProperty(this,"value",{
 		get:function(){
 			var outputs = this.element.querySelectorAll("input"),
@@ -885,7 +906,6 @@ multiSliderWidget.prototype.initialize = function(){
 			return values;
 		},
 		set:function(){
-			//debugger;
 			if(arguments!= undefined){
 				var values = arguments;
 				if(arguments[0] instanceof Array){
@@ -893,7 +913,6 @@ multiSliderWidget.prototype.initialize = function(){
 				} 
 				outputs = this.element.querySelectorAll("input");
 				for(var index in values){
-				//values.forEach(function(value,index){
 					if(outputs[index] != undefined && outputs[index].data != undefined){
 						outputs[index].data.value = values[index];
 						outputs[index].data.onUpdate();
@@ -928,7 +947,7 @@ multiSliderWidget.prototype.getValues = function(){
 			}
 			return 0;
 		};
-		this.parameters.forEach(function(param){
+		this.properties.parameters.forEach(function(param){
 			parent.values.push(getLowerLimit(param));
 		});
 	} else {
@@ -961,17 +980,20 @@ multiSliderWidget.prototype.setValues = function(){
 	}
 }
 multiSliderWidget.prototype.configureSelf = function(){
+	//settings are: parameters, configuration, orientation, and axis inversions
 	//creates the inner html based on our settings
+	this.getSettings();
+	this.loadSettings();
 	this.getValues();
 	var parent = this, members = [], pIndex = 0;
 	//add the sliders
-	parent.configuration && parent.configuration.forEach(function(thisConfig, index){
+	parent.properties.configuration && parent.properties.configuration.forEach(function(thisConfig, index){
 		//build the object
 		//check our type against the parent type and switch if necessary
 		if(parent.properties.orientation == thisConfig){thisConfig = (parent.properties.orientation=="horizontal")?"vertical":"horizontal";}
 		var thisMember = {className:"sliderWidget",properties:{orientation:thisConfig}};
 		if(thisMember.properties.orientation == "pane"){
-			thisMember.properties.type = {x:parent.parameters[pIndex],y:parent.parameters[++pIndex]};
+			thisMember.properties.type = {x:parent.properties.parameters[pIndex],y:parent.properties.parameters[++pIndex]};
 			if(parent.knownTypes[thisMember.properties.type.x] != undefined){
 				for(var key in parent.knownTypes[thisMember.properties.type.x]){
 					thisMember.properties[key+"X"] = parent.knownTypes[thisMember.properties.type.x][key];
@@ -984,7 +1006,7 @@ multiSliderWidget.prototype.configureSelf = function(){
 			//condense to a single string
 			thisMember.properties.type = thisMember.properties.type.x+"-"+thisMember.properties.type.y;
 		} else {
-			thisMember.properties.type = parent.parameters[pIndex];
+			thisMember.properties.type = parent.properties.parameters[pIndex];
 			if(parent.knownTypes[thisMember.properties.type] != undefined){
 				for(var key in parent.knownTypes[thisMember.properties.type]){
 					thisMember.properties[key] = parent.knownTypes[thisMember.properties.type][key];
@@ -992,13 +1014,13 @@ multiSliderWidget.prototype.configureSelf = function(){
 			}
 		}
 		//store inversions
-		if(parent.invertX && parent.invertX[index]) { thisMember.properties.invertX = true;}
-		if(parent.invertY && parent.invertY[index]) { thisMember.properties.invertY = true;}
+		if(parent.properties.invertXConfig && parent.properties.invertXConfig[index]) { thisMember.properties.invertX = true;}
+		if(parent.properties.invertYConfig && parent.properties.invertYConfig[index]) { thisMember.properties.invertY = true;}
 		pIndex++;
 		members.push(thisMember);
 	});
 	//add our outputs
-	if(parent.parameters){
+	if(parent.properties.parameters){
 		var outputMember = {className:"widget", members:[]};
 		switch(this.properties.orientation){
 			case "horizontal":
@@ -1008,7 +1030,7 @@ multiSliderWidget.prototype.configureSelf = function(){
 				outputMember.properties = {orientation:"horizontal"};
 				break;
 		}
-		parent.parameters.forEach(function(thisParam){
+		parent.properties.parameters.forEach(function(thisParam){
 			var thisOutput = {className:"ioWidget", tag:"input", label:thisParam};
 			outputMember.members.push(thisOutput);
 		});
@@ -1019,7 +1041,7 @@ multiSliderWidget.prototype.configureSelf = function(){
 	Application.initializeClasses(parent.element.children);
 	//hook up output to sliders and sliders to output
 	pIndex = 0, output = parent.element.children[parent.element.children.length-1], outputs = output.querySelectorAll("input");
-	parent.configuration.forEach(function(value, index){
+	parent.properties.configuration.forEach(function(value, index){
 		var thisSlider = parent.element.children[index].data,
 		thisOutput = outputs[pIndex].data;
 		if(value == "pane"){
@@ -1089,6 +1111,7 @@ multiSliderWidget.prototype.onClick = function(event){
 				event.preventDefault();
 				event.stopPropagation();
 			} else {
+				this.data.saveSettings();
 				this.data.configureSelf();
 				event.preventDefault();
 				event.stopPropagation();
@@ -1113,14 +1136,14 @@ multiSliderWidget.prototype.showConfig = function(){
 	addButton("rotate",function(e){parent.rotate();e.preventDefault();e.stopPropagation();}, configOverlay);
 	parent.element.insertBefore(configOverlay, parent.element.children[0]);
 	//configOverlay.addEventListener("mousedown",function(e){debugger;e.stopPropagation();e.preventDefault();parent.configureSelf();return false;});
-	this.configuration.forEach(function(value, index){
+	this.properties.configuration.forEach(function(value, index){
 		//get the associated slider
 		thisSlider = sliders[index].data;
 		var newElement = document.createElement("div");
 		newElement.classList.add("overlay");
 		newElement.classList.add(parent.properties.orientation);
 		thisSlider.element.insertBefore(newElement, thisSlider.element.children[0]);
-		newElement.addEventListener("mousedown",function(e){e.preventDefault();e.stopPropagation();if(e.button == 2){parent.configOn = false;parent.configureSelf();}return false;});
+		newElement.addEventListener("mousedown",function(e){e.preventDefault();e.stopPropagation();if(e.button == 2){parent.configOn = false;parent.saveSettings();parent.configureSelf();}return false;});
 		//build the necessary config buttons for this element
 		if(thisSlider.properties.orientation == "pane"){
 			addButton("split", function(e){parent.split(index);}, newElement); //split into separate sliders
@@ -1129,18 +1152,24 @@ multiSliderWidget.prototype.showConfig = function(){
 			addButton("invertY", function(e){parent.invert(index, "y");}, newElement); //invert y axis
 		} else {
 			if(index>0 && sliders[index-1].data.properties.orientation != "pane"){addButton("comPrev", function(e){parent.combine(index,-1);}, newElement);} //combine prev
-			if(index < parent.configuration.length-1 && sliders[index+1].data.properties.orientation != "pane"){addButton("comNext", function(e){parent.combine(index,1);}, newElement);}//combine next
+			if(index < parent.properties.configuration.length-1 && sliders[index+1].data.properties.orientation != "pane"){addButton("comNext", function(e){parent.combine(index,1);}, newElement);}//combine next
 			addButton((parent.properties.orientation=="horizontal")?"invertY":"invertX", function(e){parent.invert(index);}, newElement);
 		}
 		if(index>0){addButton("movePrev", function(e){parent.move(index, -1);}, newElement);} //move prev
-		if(index < parent.configuration.length-1){addButton("moveNext", function(e){parent.move(index, 1);}, newElement);}//move next
+		if(index < parent.properties.configuration.length-1){addButton("moveNext", function(e){parent.move(index, 1);}, newElement);}//move next
 	});
 }
 multiSliderWidget.prototype.configToArray = function(){
 	var totalConfig = [], pIndex = 0, parent = this;
-	this.configuration.forEach(function(value, index){
+	this.settings.configuration.forEach(function(value, index){
+	//this.configuration.forEach(function(value, index){
 		var thisConfig = {orientation:value};
-		if(value=="pane"){thisConfig.type = [parent.parameters[pIndex],parent.parameters[++pIndex]];}else{thisConfig.type = [parent.parameters[pIndex]];}
+		//if(value=="pane"){thisConfig.type = [parent.parameters[pIndex],parent.parameters[++pIndex]];}else{thisConfig.type = [parent.parameters[pIndex]];}
+		if(value == "pane") {
+			thisConfig.type = [parent.settings.parameters[pIndex], parent.settings.parameters[++pIndex]];
+		} else {
+			thisConfig.type = [parent.settings.parameters[pIndex]];
+		}
 		totalConfig.push(thisConfig);
 		pIndex++;
 	});
@@ -1154,8 +1183,10 @@ multiSliderWidget.prototype.arrayToConfig = function(totalConfig){
 			params.push(type);
 		});
 	});
-	this.configuration = config;
-	this.parameters = params;
+	//this.configuration = config;
+	//this.parameters = params;
+	this.settings.configuration = config;
+	this.settings.parameters = params;
 }
 multiSliderWidget.prototype.move = function(index, direction){
 	//package everything up into objects
@@ -1180,7 +1211,8 @@ multiSliderWidget.prototype.combine = function(index, direction){
 multiSliderWidget.prototype.split = function(index){
 	//split the config
 	var thisOrientation = (this.properties.orientation == "horizontal")?"vertical":"horizontal";
-	this.configuration.splice(index,1, thisOrientation, thisOrientation);
+	//this.configuration.splice(index,1, thisOrientation, thisOrientation);
+	this.settings.configuration.splice(index, 1, thisOrientation, thisOrientation);
 	//rebuild
 	this.configureSelf();
 	this.showConfig();
@@ -1195,26 +1227,26 @@ multiSliderWidget.prototype.swap = function(index){
 multiSliderWidget.prototype.invert = function(index, axis){
 	this.element.querySelectorAll("[data-class=sliderWidget]")[index].data.invertAxis(axis);
 	//store to internal
-	if(this.invertX == undefined){this.invertX = new Array(this.configuration.length);}
-	if(this.invertY == undefined){this.invertY = new Array(this.configuration.length);}
-	if(axis == undefined || axis.toUpperCase() != "Y"){this.invertX[index] = !this.invertX[index];}
-	if(axis == undefined || axis.toUpperCase() != "X"){this.invertY[index] = !this.invertY[index];}
+	if(this.settings.invertXConfig == undefined){this.settings.invertXConfig = new Array(this.settings.configuration.length);}
+	if(this.settings.invertYConfig == undefined){this.settings.invertYConfig = new Array(this.settings.configuration.length);}
+	if(axis == undefined || axis.toUpperCase() != "Y"){this.settings.invertXConfig[index] = !this.settings.invertXConfig[index];}
+	if(axis == undefined || axis.toUpperCase() != "X"){this.settings.invertYConfig[index] = !this.settings.invertYConfig[index];}
 }
 multiSliderWidget.prototype.rotate = function(){
 	var parent = this, flipSlider = function(){
-		parent.configuration.forEach(function(orientation, index){
+		parent.settings.configuration.forEach(function(orientation, index){
 			if(orientation == "horizontal"){
-				parent.configuration[index] = "vertical";
+				parent.settings.configuration[index] = "vertical";
 			} else if(orientation == "vertical"){
-				parent.configuration[index] = "horizontal";
+				parent.settings.configuration[index] = "horizontal";
 			}
 		});
 	};
-	if(this.properties.orientation == "vertical"){
-		this.properties.orientation = "horizontal";
+	if(this.settings.orientation == "vertical"){
+		this.settings.orientation = "horizontal";
 		flipSlider();
 	} else {
-		this.properties.orientation = "vertical";
+		this.settings.orientation = "vertical";
 		flipSlider();
 	}
 	this.configureSelf();
@@ -1227,10 +1259,12 @@ multiSliderWidget.prototype.rotate = function(){
 //some saved configurations of a multiSliderWidget
 function rgbWidget(element){
 	multiSliderWidget.call(this, element);
-	this.parameters = ["red", "green", "blue"];
-	this.configuration = ["horizontal", "horizontal", "horizontal"];
-	this.properties.orientation = "vertical";
-	this.color = new PXL();
+	this.settings = {
+		parameters:["red", "green", "blue"],
+		configuration:["horizontal", "horizontal", "horizontal"],
+		orientation:"vertical"
+	}
+	this.properties.color = new PXL();
 }
 rgbWidget.prototype = new multiSliderWidget();
 rgbWidget.prototype.constructor = rgbWidget;
@@ -1240,30 +1274,32 @@ rgbWidget.prototype.onUpdate = function(){
 
 function hsvWidget(element){
 	multiSliderWidget.call(this, element);
-	this.parameters = ["hue", "saturation", "value"];
-	this.configuration = ["vertical", "pane"];
-	this.color = new PXL();
+	this.settings = {
+		parameters:["hue", "saturation", "value"],
+		configuration:["vertical", "pane"]
+	}
+	this.properties.color = new PXL();
 }
 hsvWidget.prototype = new multiSliderWidget();
 hsvWidget.prototype.constructor = hsvWidget;
 hsvWidget.prototype.onUpdate = function(){
 	var satSlider = this.element.querySelector(".type-saturation");
 	if(satSlider != null){
-		var hue = this.value[this.parameters.indexOf("hue")];
-		hue = this.color.HSVtoRGB(hue, 1, 1);
+		var hue = this.value[this.properties.parameters.indexOf("hue")];
+		hue = this.properties.color.HSVtoRGB(hue, 1, 1);
 		satSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
 	}
 	var valSlider = this.element.querySelector(".type-value");
 	if(valSlider != null){
-		var hue = this.value[this.parameters.indexOf("hue")];
-		var sat = this.value[this.parameters.indexOf("saturation")];
-		hue = this.color.HSVtoRGB(hue, sat/100, 1);
+		var hue = this.value[this.properties.parameters.indexOf("hue")];
+		var sat = this.value[this.properties.parameters.indexOf("saturation")];
+		hue = this.properties.color.HSVtoRGB(hue, sat/100, 1);
 		valSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
 	}
 	var satvalSlider = this.element.querySelector(".type-saturation-value, .type-value-saturation");
 	if(satvalSlider != null){
-		var hue = this.value[this.parameters.indexOf("hue")];
-		hue = this.color.HSVtoRGB(hue, 1, 1);
+		var hue = this.value[this.properties.parameters.indexOf("hue")];
+		hue = this.properties.color.HSVtoRGB(hue, 1, 1);
 		satvalSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
 	}
 }
@@ -1275,81 +1311,7 @@ function hslWidget(element){
 }
 hslWidget.prototype = new multiSliderWidget();
 hslWidget.prototype.constructor = hslWidget;
-/*
-//rgb widget
-function rgbWidget(element) {
-	widget.call(this, element);
-	this.members = [
-		{ className:"ioSliderWidget", name:"red", 
-	        properties:{orientation:"horizontal", type:"red", upperLimit:255, output:"int"}},
-	    { className:"ioSliderWidget", name:"green", 
-	        properties:{orientation:"horizontal",type:"green", upperLimit:255, output:"int" }},
-	    { className:"ioSliderWidget", name:"blue", 
-	        properties:{orientation:"horizontal",type:"blue", upperLimit:255, output:"int" }},
-		{ className:"swatchWidget", name:"swatch" }
-	];
-	this.color = new PXL();
-}
-rgbWidget.prototype = new widget();
-rgbWidget.prototype.constructor = rgbWidget;
-rgbWidget.prototype.initialize = function(){
-	widget.prototype.initialize.call(this);
-	Object.defineProperty(this, "color", {
-	
-	});
-}
-rgbWidget.prototype.postInitialize = function() {
-	widget.prototype.postInitialize.call(this);
-	var parent = this,
-	parentSetColor = function(){parent.setColor.call(parent);};
-	this.red.data.onUpdate = parentSetColor;
-	this.green.data.onUpdate = parentSetColor;
-	this.blue.data.onUpdate = parentSetColor;
-}
-rgbWidget.prototype.setColor = function() {
-	this.color.red = this.color.setValue(this.red.data.value);
-	this.color.green = this.color.setValue(this.green.data.value);
-	this.color.blue = this.color.setValue(this.blue.data.value);
-	var thisColor = "rgb("+this.color.toColor("rgb")+")";
-	this.swatch.data.element.style.background = thisColor;
-}
-rgbWidget.prototype.setValues = function(){
-	//drive the sliders from external inputs
-}
-*/
-//hsl widget
-//hsv widget
-/*
-function hsvWidget(element){
-	widget.call(this,element);
-	this.members = [
-		{ className:"ioSliderWidget", name:"satval", properties:{
-			orientation:"pane", type:"satval", upperLimit:100, output:"int"}},
-		{ className:"ioSliderWidget", name:"hue", properties:{
-			orientation:"vertical", type:"hue", upperLimit:360, output:"int"}},
-		{ className:"swatchWidget", name:"swatch" }
-	];
-	this.color = new PXL();
-}
-hsvWidget.prototype = new widget();
-hsvWidget.prototype.constructor = hsvWidget;
-hsvWidget.prototype.postInitialize = function(){
-	widget.prototype.postInitialize.call(this);
-	//hook up specialized behavior
-	var parent = this;
-	this.hue.data.onUpdate = function(){ parent.setHue();};
-	this.satval.data.onUpdate = function(){parent.setColor();};
-}
-hsvWidget.prototype.setHue = function(){
-	var color = this.color.HSVtoRGB(this.hue.data.value,1,1);
-	this.satval.data.slider.data.element.style.background = "-webkit-linear-gradient(left, white, rgb("+color[0]+","+color[1]+","+color[2]+")";
-	this.setColor();
-}
-hsvWidget.prototype.setColor = function(){
-	var color = this.color.HSVtoRGB(this.hue.data.value,this.satval.data.value.x/100, 1 - (this.satval.data.value.y/100));
-	this.swatch.data.element.style.background = "rgb("+color[0]+","+color[1]+","+color[2]+")";
-}
-*/
+
 //color picker
 function colorPickerWidget (element) {
 	widget.call(this, element);
