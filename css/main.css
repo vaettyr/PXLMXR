@@ -202,13 +202,17 @@ button.rotate{
 {
 	background : -webkit-linear-gradient(top, black, blue);
 }
-.sliderWidget.orientation-vertical.type-lightness
+.sliderWidget.type-lightness
 {
-	background:-webkit-linear-gradient(top, black, white);
+	background:grey;
 }
-.sliderWidget.orientation-horizontal.type-lightness
+.sliderWidget.orientation-vertical.type-lightness:after
 {
-	background:-webkit-linear-gradient(left, black, white);
+	background:-webkit-linear-gradient(top, rgba(0,0,0,1),rgba(128,128,128,0), rgba(255,255,255,1));
+}
+.sliderWidget.orientation-horizontal.type-lightness:after
+{
+	background:-webkit-linear-gradient(left, rgba(0,0,0,1),rgba(128,128,128,0), rgba(255,255,255,1));
 }
 .sliderWidget.type-saturation
 {
@@ -224,7 +228,7 @@ button.rotate{
 }
 .sliderWidget.type-value
 {
-	background:red;
+	background:white;
 }
 .sliderWidget.orientation-vertical.type-value:after
 {
@@ -303,6 +307,14 @@ button.rotate{
 .sliderWidget.type-value-hue
 {
 	background:-webkit-linear-gradient(left,rgba(0,0,0,0),rgba(0,0,0,1)),-webkit-linear-gradient(top, red, yellow, green, cyan, blue, magenta, red);
+}
+.sliderWidget.type-hue-lightness
+{
+	background:-webkit-linear-gradient(top, rgba(0,0,0,1), rgba(128,128,128,0),rgba(255,255,255,1)),-webkit-linear-gradient(left, red, yellow, green, cyan, blue, magenta, red);
+}
+.sliderWidget.type-lightness-hue
+{
+	 background:-webkit-linear-gradient(left, rgba(0,0,0,1), rgba(128,128,128,0),rgba(255,255,255,1)),-webkit-linear-gradient(top, red, yellow, green, cyan, blue, magenta, red);
 }
 .sliderWidget:after
 {

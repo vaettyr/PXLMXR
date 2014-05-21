@@ -470,7 +470,8 @@ configWidget.prototype.initialize = function(){
 			this.settings[setting] = thisSettings[setting];
 		}
 	}
-	// push settings to properties ?
+	// push settings to properties
+	this.loadSettings();
 	widget.prototype.initialize.call(this);
 	//spawn members and initialize them
 }
@@ -479,6 +480,67 @@ configWidget.prototype.configureSelf = function() {
 }
 configWidget.prototype.showConfig = function(){
 	//displays any default configuration options
+	//encapsulated functionality
+	var addButton = function(htmlClass, onPress, element){
+		var thisButton = document.createElement("button");
+		thisButton.classList.add(htmlClass);
+		thisButton.addEventListener("click", onPress);
+		element.insertBefore(thisButton, element.children[element.children.length]);
+	},
+	buildOverlay = function(htmlClasses, onPress){
+		var thisOverlay = document.createElement("div");
+		htmlClasses.forEach(function(thisClass){
+			thisOverlay.classList.add(thisClass);
+		});
+		if(onPress != undefined){
+			
+		}
+	}
+	
+	//functionality
+	//set configOn to true (useful for callbacks)
+	//get objects we'll be setting configs on
+	//helper *add button* function
+	
+	//basic flow should after that is, select a group of object and build the overlay for them
+	//building an overlay consists of: creating an element, adding classes, adding click event handlers(?), adding buttons, and inserting it into the dom
+	/*
+	this.configOn = true;
+	var parent = this, sliders = parent.element.querySelectorAll("[data-class=sliderWidget]");
+	var addButton = function(htmlClass, onPress, element){
+		var thisButton = document.createElement("button");
+		thisButton.classList.add(htmlClass);
+		thisButton.addEventListener("click", onPress);
+		element.insertBefore(thisButton, element.children[element.children.length]);
+	}
+	var configOverlay = document.createElement("div");
+	configOverlay.classList.add("multiOverlay");
+	addButton("rotate",function(e){parent.rotate();e.preventDefault();e.stopPropagation();}, configOverlay);
+	parent.element.insertBefore(configOverlay, parent.element.children[0]);
+	this.properties.configuration.forEach(function(value, index){
+		//get the associated slider
+		thisSlider = sliders[index].data;
+		var newElement = document.createElement("div");
+		newElement.classList.add("overlay");
+		newElement.classList.add(parent.properties.orientation);
+		thisSlider.element.insertBefore(newElement, thisSlider.element.children[0]);
+		// move this functionality into it's own handler so it's easier to find
+		newElement.addEventListener("mousedown",function(e){e.preventDefault();e.stopPropagation();if(e.button == 2){parent.configOn = false;parent.saveSettings();parent.configureSelf();}return false;});
+		//build the necessary config buttons for this element
+		if(thisSlider.properties.orientation == "pane"){
+			addButton("split", function(e){parent.split(index);}, newElement); //split into separate sliders
+			addButton("swap", function(e){parent.swap(index);}, newElement); // swap axes
+			addButton("invertX", function(e){parent.invert(index, "x");}, newElement); // invert x axis
+			addButton("invertY", function(e){parent.invert(index, "y");}, newElement); //invert y axis
+		} else {
+			if(index>0 && sliders[index-1].data.properties.orientation != "pane"){addButton("comPrev", function(e){parent.combine(index,-1);}, newElement);} //combine prev
+			if(index < parent.properties.configuration.length-1 && sliders[index+1].data.properties.orientation != "pane"){addButton("comNext", function(e){parent.combine(index,1);}, newElement);}//combine next
+			addButton((parent.properties.orientation=="horizontal")?"invertY":"invertX", function(e){parent.invert(index);}, newElement);
+		}
+		if(index>0){addButton("movePrev", function(e){parent.move(index, -1);}, newElement);} //move prev
+		if(index < parent.properties.configuration.length-1){addButton("moveNext", function(e){parent.move(index, 1);}, newElement);}//move next
+	});
+	*/
 }
 configWidget.prototype.getSettings = function(){
 	var thisConstructor = this.constructor.name,
@@ -506,6 +568,7 @@ configWidget.prototype.loadSettings = function(){
 	}
 	return false;
 }
+
 //input/output widget
 function ioWidget (element) {
 	widget.call(this, element);
@@ -661,9 +724,9 @@ sliderWidget.prototype.setSliderPosition = function (pageX, pageY) {
 	mousePosY = (pageY - limits.top) - (width/2);
 	if(this.properties.invertX){mousePosX = (limits.right - pageX) - (width/2);}
 	if(this.properties.invertY){mousePosY = (limits.bottom - pageY) - (width/2);}
-	mousePosX = mousePosX - document.body.scrollLeft;
+	mousePosX = mousePosX - (document.body.scrollLeft * ((this.properties.invertX)?-1:1));
 	mousePosX = Math.min(Math.max(mousePosX,0),this.element.offsetWidth-width);
-	mousePosY = mousePosY - document.body.scrollTop;
+	mousePosY = mousePosY - (document.body.scrollTop * ((this.properties.invertY)?-1:1));
 	mousePosY = Math.min(Math.max(mousePosY, 0), this.element.offsetHeight - width);
 	
 	if(this.properties.orientation != 'vertical'){	indicator.style.left = mousePosX + "px";}
@@ -726,8 +789,6 @@ sliderIndicator.prototype = new widget();
 sliderIndicator.prototype.constructor = sliderIndicator;
 
 //ioSlider widget
-//TODO: re-work changeViewMode function
-//or, REMOVE
 function ioSliderWidget(element) {
 	widget.call(this,element);
 	this.properties = { 
@@ -807,68 +868,6 @@ ioSliderWidget.prototype.postInitialize = function () {
 ioSliderWidget.prototype.onUpdate = function(){
 	//placeholder function for other objects to override
 }
-ioSliderWidget.prototype.changeViewMode = function (viewmode) {
-	if(viewmode===this.properties.viewMode){return;}
-	/*
-	if(this.properties.viewMode != "both" || viewmode != "both"){
-		var parent = this,
-		elements = [this, this.slider.data];
-		if(this.properties.orientation == "pane"){
-			elements.push(this.outputX.data);
-			elements.push(this.ouputY.data);
-		} else {
-			elements.push(this.output.data);
-		}
-		elements.forEach(function(element){
-			element.addClass("viewMode-"+viewmode);
-			element.removeClass("viewMode-"+parent.properties.viewMode);
-		});
-	} 
-	*/
-	var parent = this,
-	startViewMode = this.properties.viewMode,
-	slider = this.slider.data,
-	output = (this.properties.orientation == "pane")?[this.ouputX.data, this.outputY.data]:[this.output.data];
-	switch(viewmode){
-		case "slider":
-			//hide outputs
-			output.forEach(function(element){ element.animate("width","0em",200, function(){
-				output.forEach(function(element){ element.animate("opacity",0,100, function(){
-					output.forEach(function(element){element.element.style.display = "none";});
-					//show sliders
-					if(startViewMode == "output"){
-						slider.element.style.display = null;
-						slider.animate("opacity", 1, 100, function(){
-							slider.animate("width", "100%", 200);
-						});
-					} else {
-						slider.animate("width", "100%", 200);
-					}
-				})});
-			})});
-			break;
-		case "output":
-			//hide slider
-			slider.animate("width", "0%", 200, function(){
-				slider.animate("opacity", 0, 100, function(){
-					slider.element.style.display = "none";
-					if(startViewMode == "slider"){
-						//display the output
-						output.forEach(function(element){
-							element.element.style.display = null;
-							element.animate("opacity", 1, 100);
-							element.animate("width", "3em", 200);
-						});
-					} 
-				});
-			});
-			break;
-		default:
-		
-			break;
-	}
-	this.properties.viewMode = viewmode;
-}
 
 //TODO: rename to colorWidget. Can be inherited from for palette swatches, etc
 //color swatch widget
@@ -925,9 +924,10 @@ multiSliderWidget.prototype.initialize = function(){
 	});
 }
 multiSliderWidget.prototype.postInitialize = function() {
-	widget.prototype.postInitialize.call(this);
+	configWidget.prototype.postInitialize.call(this);
 	this.configureSelf();
 }
+//move these to inherited types
 multiSliderWidget.prototype.knownTypes = {
 	hue:{upperLimit:360,output:"int"},
 	saturation:{upperLimit:100,output:"int"},
@@ -937,6 +937,7 @@ multiSliderWidget.prototype.knownTypes = {
 	green:{upperLimit:255,output:"int"},
 	blue:{upperLimit:255,output:"int"}
 };
+//change this from an array output to a typed object output
 multiSliderWidget.prototype.getValues = function(){
 	if(this.values == undefined){
 		this.values = [], parent = this,
@@ -969,6 +970,7 @@ multiSliderWidget.prototype.getValues = function(){
 		}
 	}
 }
+//change this to support array and typed object input
 multiSliderWidget.prototype.setValues = function(){
 	if(this.values == undefined){this.getValues();}
 	var thisOutput = this.element.querySelectorAll("input");
@@ -979,6 +981,7 @@ multiSliderWidget.prototype.setValues = function(){
 		}
 	}
 }
+//move some functionality to configWidget
 multiSliderWidget.prototype.configureSelf = function(){
 	//settings are: parameters, configuration, orientation, and axis inversions
 	//creates the inner html based on our settings
@@ -1080,6 +1083,7 @@ multiSliderWidget.prototype.configureSelf = function(){
 	parent.setValues();
 	parent.element.addEventListener("mousedown", parent.onClick, false);
 }
+//move some functionality to configWidget
 multiSliderWidget.prototype.onClick = function(event){
 	//maybe add a left-click while active to bring up the multi-widget config options
 	switch(event.button){
@@ -1120,9 +1124,8 @@ multiSliderWidget.prototype.onClick = function(event){
 	}
 	return false;
 }
+//move some functionality to configWidget
 multiSliderWidget.prototype.showConfig = function(){
-	//things we can edit 
-	//dimensions and position
 	this.configOn = true;
 	var parent = this, sliders = parent.element.querySelectorAll("[data-class=sliderWidget]");
 	var addButton = function(htmlClass, onPress, element){
@@ -1135,7 +1138,6 @@ multiSliderWidget.prototype.showConfig = function(){
 	configOverlay.classList.add("multiOverlay");
 	addButton("rotate",function(e){parent.rotate();e.preventDefault();e.stopPropagation();}, configOverlay);
 	parent.element.insertBefore(configOverlay, parent.element.children[0]);
-	//configOverlay.addEventListener("mousedown",function(e){debugger;e.stopPropagation();e.preventDefault();parent.configureSelf();return false;});
 	this.properties.configuration.forEach(function(value, index){
 		//get the associated slider
 		thisSlider = sliders[index].data;
@@ -1143,6 +1145,7 @@ multiSliderWidget.prototype.showConfig = function(){
 		newElement.classList.add("overlay");
 		newElement.classList.add(parent.properties.orientation);
 		thisSlider.element.insertBefore(newElement, thisSlider.element.children[0]);
+		// move this functionality into it's own handler so it's easier to find
 		newElement.addEventListener("mousedown",function(e){e.preventDefault();e.stopPropagation();if(e.button == 2){parent.configOn = false;parent.saveSettings();parent.configureSelf();}return false;});
 		//build the necessary config buttons for this element
 		if(thisSlider.properties.orientation == "pane"){
@@ -1162,9 +1165,7 @@ multiSliderWidget.prototype.showConfig = function(){
 multiSliderWidget.prototype.configToArray = function(){
 	var totalConfig = [], pIndex = 0, parent = this;
 	this.settings.configuration.forEach(function(value, index){
-	//this.configuration.forEach(function(value, index){
 		var thisConfig = {orientation:value};
-		//if(value=="pane"){thisConfig.type = [parent.parameters[pIndex],parent.parameters[++pIndex]];}else{thisConfig.type = [parent.parameters[pIndex]];}
 		if(value == "pane") {
 			thisConfig.type = [parent.settings.parameters[pIndex], parent.settings.parameters[++pIndex]];
 		} else {
@@ -1183,37 +1184,26 @@ multiSliderWidget.prototype.arrayToConfig = function(totalConfig){
 			params.push(type);
 		});
 	});
-	//this.configuration = config;
-	//this.parameters = params;
 	this.settings.configuration = config;
 	this.settings.parameters = params;
 }
 multiSliderWidget.prototype.move = function(index, direction){
-	//package everything up into objects
 	var totalConfig = this.configToArray();
-	//sort the objects
 	totalConfig[index] = totalConfig.splice(index+direction, 1, totalConfig[index])[0];
-	//unpack them
 	this.arrayToConfig(totalConfig);
 	this.configureSelf();
 	this.showConfig();
 }
 multiSliderWidget.prototype.combine = function(index, direction){
-	//package everything up into objects
 	var totalConfig = this.configToArray();
-	//combine the two targets
 	totalConfig.splice((direction>0)?index:index+direction,2,{orientation:"pane",type:[totalConfig[index].type[0],totalConfig[index+direction].type[0]]});
-	//unpack them
 	this.arrayToConfig(totalConfig);
 	this.configureSelf();
 	this.showConfig();
 }
 multiSliderWidget.prototype.split = function(index){
-	//split the config
 	var thisOrientation = (this.properties.orientation == "horizontal")?"vertical":"horizontal";
-	//this.configuration.splice(index,1, thisOrientation, thisOrientation);
 	this.settings.configuration.splice(index, 1, thisOrientation, thisOrientation);
-	//rebuild
 	this.configureSelf();
 	this.showConfig();
 }
@@ -1226,7 +1216,6 @@ multiSliderWidget.prototype.swap = function(index){
 }
 multiSliderWidget.prototype.invert = function(index, axis){
 	this.element.querySelectorAll("[data-class=sliderWidget]")[index].data.invertAxis(axis);
-	//store to internal
 	if(this.settings.invertXConfig == undefined){this.settings.invertXConfig = new Array(this.settings.configuration.length);}
 	if(this.settings.invertYConfig == undefined){this.settings.invertYConfig = new Array(this.settings.configuration.length);}
 	if(axis == undefined || axis.toUpperCase() != "Y"){this.settings.invertXConfig[index] = !this.settings.invertXConfig[index];}
@@ -1306,11 +1295,29 @@ hsvWidget.prototype.onUpdate = function(){
 
 function hslWidget(element){
 	multiSliderWidget.call(this, element);
-	this.parameters = ["hue", "saturation", "lightness"];
-	this.configuration = ["pane", "vertical"];
+	this.settings = {
+		parameters:["hue", "saturation", "lightness"],
+		configuration:["pane", "vertical"]
+	};
+	this.properties.color = new PXL();
 }
 hslWidget.prototype = new multiSliderWidget();
 hslWidget.prototype.constructor = hslWidget;
+hslWidget.prototype.onUpdate = function(){
+	var satSlider = this.element.querySelector(".type-saturation");
+	if(satSlider != null){
+		var hue = this.value[this.properties.parameters.indexOf("hue")];
+		hue = this.properties.color.HSVtoRGB(hue, 1, 1);
+		satSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
+	}
+	var lightSlider = this.element.querySelector(".type-lightness");
+	if(lightSlider != null){
+		var hue = this.value[this.properties.parameters.indexOf("hue")];
+		var sat = this.value[this.properties.parameters.indexOf("saturation")];
+		hue = this.properties.color.HSVtoRGB(hue, sat/100, 0.5);
+		lightSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
+	}
+}
 
 //color picker
 function colorPickerWidget (element) {
