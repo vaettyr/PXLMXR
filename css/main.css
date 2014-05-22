@@ -56,6 +56,23 @@ label:after
 {
 	opacity:1;
 }
+.overlay>button>span, .multiOverlay>button>span
+{
+	position:fixed;
+	margin-left:2em;
+	background:rgb(120,150,200);
+	padding:0.3em;
+	border-radius:0.5em;
+	display:none;
+	opacity:0;
+	transition:opacity 200ms;
+}
+.overlay>button:hover>span, .multiOverlay>button:hover>span
+{
+	display:inline;
+	opacity:1;
+	transition:opacity 200ms;
+}
 .overlay > button
 {
 	flex:1 1 auto;
@@ -315,6 +332,22 @@ button.rotate{
 .sliderWidget.type-lightness-hue
 {
 	 background:-webkit-linear-gradient(left, rgba(0,0,0,1), rgba(128,128,128,0),rgba(255,255,255,1)),-webkit-linear-gradient(top, red, yellow, green, cyan, blue, magenta, red);
+}
+.sliderWidget.type-saturation-lightness
+{
+	background:red;
+}
+.sliderWidget.type-saturation-lightness:after
+{
+	background:-webkit-linear-gradient(top,rgba(0,0,0,1),rgba(128,128,128,0),rgba(255,255,255,1)),-webkit-linear-gradient(left,rgba(128,128,128,1),rgba(128,128,128,0));
+}	
+.sliderWidget.type-lightness-saturation
+{
+	background:red;
+}
+.sliderWidget.type-lightness-saturation:after
+{
+	background:-webkit-linear-gradient(left,rgba(0,0,0,1),rgba(128,128,128,0),rgba(255,255,255,1)),-webkit-linear-gradient(top,rgba(128,128,128,1),rgba(128,128,128,0));
 }
 .sliderWidget:after
 {

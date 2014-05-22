@@ -1,5 +1,4 @@
 //main.js
-//TODO: Move functions out of constructors. 
 //They get duplicated with each instantiation.
 //Declare them in a prototype instead.
 //http://en.wikipedia.org/wiki/HSL_and_HSV#Converting_to_RGB
@@ -235,7 +234,6 @@ var Application = {
 };
 
 //base abstract class to base all widgets on
-//TODO: pull settings out of base widget
 function widget(element) {
 	this.element = element;
 };
@@ -247,6 +245,7 @@ widget.prototype.initialize = function(){
 		if(htmlAttributes[index].name!=undefined && htmlAttributes[index].name.match(/^data-(?!class)/i)){
 			var content = this.parseHTML(htmlAttributes[index].value),
 			attribute = htmlAttributes[index].name.slice(5);
+			if(attribute=="members"){content = JSON.parse(htmlAttributes[index].value);}
 			if(this[attribute] == undefined || typeof content != "object" || content instanceof Array){
 				this[attribute] = content;
 			} else {
@@ -286,9 +285,14 @@ widget.prototype.initialize = function(){
 				thisMember.properties[key] = (thisMember.properties[key])?thisMember.properties[key]:this.properties[key];
 			}
 			for(var attribute in thisMember){
-				if(attribute != "tag" && attribute != "className" && attribute != "attributes" && attribute != "settings" && thisMember[attribute]){
+				//write members out using JSON
+				if(attribute != "tag" && attribute != "className" && attribute != "attributes" && attribute != "settings" && attribute != "members" && thisMember[attribute]){
 					html += "data-"+attribute+"='";
 					html += this.toHTML(thisMember[attribute])+"'";
+				}
+				if(attribute == "members"){
+					html += "data-members='";
+					html += JSON.stringify(thisMember[attribute])+"'";
 				}
 			}
 			//add tag attributes
@@ -455,6 +459,7 @@ widget.prototype.animate = function (property, value, time, callback){
 }
 
 //base abstract class to base widgets that can be configured and have saved settings
+//TODO: finish showConfig and configureSelf base functionality
 function configWidget(element){
 	widget.call(this, element);
 	this.settings = {};
@@ -478,25 +483,36 @@ configWidget.prototype.initialize = function(){
 configWidget.prototype.configureSelf = function() {
 	//this is effectively a re-initialization after certain properties and members have been altered
 }
-configWidget.prototype.showConfig = function(){
+configWidget.prototype.showConfig = function(configBuilder){
 	//displays any default configuration options
+	this.configOn = true;
 	//encapsulated functionality
-	var addButton = function(htmlClass, onPress, element){
-		var thisButton = document.createElement("button");
-		thisButton.classList.add(htmlClass);
-		thisButton.addEventListener("click", onPress);
-		element.insertBefore(thisButton, element.children[element.children.length]);
-	},
-	buildOverlay = function(htmlClasses, onPress){
-		var thisOverlay = document.createElement("div");
-		htmlClasses.forEach(function(thisClass){
-			thisOverlay.classList.add(thisClass);
-		});
-		if(onPress != undefined){
+	var helpers = {
+		addButton:function(htmlClass, element, onPress){
+			var thisButton = document.createElement("button");
+			thisButton.classList.add(htmlClass);
+			if(onPress != undefined){
+				thisButton.addEventListener("click", onPress);
+			}
+			element.insertBefore(thisButton, element.children[element.children.length]);
+		},
+		buildOverlay:function(htmlClasses, element, overlayBuider, onPress){
+			var thisOverlay = document.createElement("div");
+			htmlClasses.forEach(function(thisClass){
+				thisOverlay.classList.add(thisClass);
+			});
+			if(onPress != undefined){
+				thisOverlay.addEventListener("click", onPress);
+			}
+			if(overlayBuilder != undefined){
+				overlayBuilder();
+			}
 			
 		}
+	};
+	if(configBuilder != undefined){
+		configBuilder.call(helpers);
 	}
-	
 	//functionality
 	//set configOn to true (useful for callbacks)
 	//get objects we'll be setting configs on
@@ -578,6 +594,8 @@ ioWidget.prototype.constructor = ioWidget;
 ioWidget.prototype.initialize = function () {
 	//ensure that we're on an input tag
 	if(this.element.tagName != "INPUT"){ return; }
+	//set our type to number
+	this.element.setAttribute("type", "number");
 	widget.prototype.initialize.call(this);
 	//hook up onUpdate default handler
 	this.element.onchange = this.onChange;
@@ -596,11 +614,12 @@ ioWidget.prototype.onChange = function() {
 		if(parent.properties.output == "int"){
 			value = Math.round(value);
 		}
-		parent.element.value = value;
+		parent.element.value = Number(value);
 	}
 	parent.onUpdate && parent.onUpdate.call(this);
 }
 
+//TODO: add a 'step' property for color bit depth
 //slider Widget
 function sliderWidget (element) {
 	widget.call(this, element);
@@ -988,7 +1007,7 @@ multiSliderWidget.prototype.configureSelf = function(){
 	this.getSettings();
 	this.loadSettings();
 	this.getValues();
-	var parent = this, members = [], pIndex = 0;
+	var parent = this, members = [], pIndex = 0, upperLimits = [];
 	//add the sliders
 	parent.properties.configuration && parent.properties.configuration.forEach(function(thisConfig, index){
 		//build the object
@@ -1000,10 +1019,12 @@ multiSliderWidget.prototype.configureSelf = function(){
 			if(parent.knownTypes[thisMember.properties.type.x] != undefined){
 				for(var key in parent.knownTypes[thisMember.properties.type.x]){
 					thisMember.properties[key+"X"] = parent.knownTypes[thisMember.properties.type.x][key];
+					if(key=="upperLimit"){upperLimits.push(thisMember.properties[key+"X"]);}
 				}
 			}if(parent.knownTypes[thisMember.properties.type.y] != undefined){
 				for(var key in parent.knownTypes[thisMember.properties.type.y]){
 					thisMember.properties[key+"Y"] = parent.knownTypes[thisMember.properties.type.y][key];
+					if(key=="upperLimit"){upperLimits.push(thisMember.properties[key+"Y"]);}
 				}
 			}
 			//condense to a single string
@@ -1013,6 +1034,7 @@ multiSliderWidget.prototype.configureSelf = function(){
 			if(parent.knownTypes[thisMember.properties.type] != undefined){
 				for(var key in parent.knownTypes[thisMember.properties.type]){
 					thisMember.properties[key] = parent.knownTypes[thisMember.properties.type][key];
+					if(key=="upperLimit"){upperLimits.push(thisMember.properties[key]);}
 				}
 			}
 		}
@@ -1033,8 +1055,8 @@ multiSliderWidget.prototype.configureSelf = function(){
 				outputMember.properties = {orientation:"horizontal"};
 				break;
 		}
-		parent.properties.parameters.forEach(function(thisParam){
-			var thisOutput = {className:"ioWidget", tag:"input", label:thisParam};
+		parent.properties.parameters.forEach(function(thisParam, index){
+			var thisOutput = {className:"ioWidget", tag:"input", label:thisParam, attributes:{type:"number"}, properties:{lowerLimit:0,upperLimit:upperLimits[index]}};
 			outputMember.members.push(thisOutput);
 		});
 		members.push(outputMember);
@@ -1126,17 +1148,23 @@ multiSliderWidget.prototype.onClick = function(event){
 }
 //move some functionality to configWidget
 multiSliderWidget.prototype.showConfig = function(){
+	var delegate = function(){debugger;};
+	configWidget.prototype.showConfig.call(this, delegate);
 	this.configOn = true;
 	var parent = this, sliders = parent.element.querySelectorAll("[data-class=sliderWidget]");
-	var addButton = function(htmlClass, onPress, element){
+	var addButton = function(htmlClass, onPress, element, tooltip){
 		var thisButton = document.createElement("button");
 		thisButton.classList.add(htmlClass);
 		thisButton.addEventListener("click", onPress);
 		element.insertBefore(thisButton, element.children[element.children.length]);
+		//add a tooltip to go with it
+		if(tooltip != undefined){
+			thisButton.insertBefore(document.createElement("span"),thisButton.children[element.children.length]).innerHTML = tooltip;
+		}
 	}
 	var configOverlay = document.createElement("div");
 	configOverlay.classList.add("multiOverlay");
-	addButton("rotate",function(e){parent.rotate();e.preventDefault();e.stopPropagation();}, configOverlay);
+	addButton("rotate",function(e){parent.rotate();e.preventDefault();e.stopPropagation();}, configOverlay, "change orientation");
 	parent.element.insertBefore(configOverlay, parent.element.children[0]);
 	this.properties.configuration.forEach(function(value, index){
 		//get the associated slider
@@ -1149,17 +1177,17 @@ multiSliderWidget.prototype.showConfig = function(){
 		newElement.addEventListener("mousedown",function(e){e.preventDefault();e.stopPropagation();if(e.button == 2){parent.configOn = false;parent.saveSettings();parent.configureSelf();}return false;});
 		//build the necessary config buttons for this element
 		if(thisSlider.properties.orientation == "pane"){
-			addButton("split", function(e){parent.split(index);}, newElement); //split into separate sliders
-			addButton("swap", function(e){parent.swap(index);}, newElement); // swap axes
-			addButton("invertX", function(e){parent.invert(index, "x");}, newElement); // invert x axis
-			addButton("invertY", function(e){parent.invert(index, "y");}, newElement); //invert y axis
+			addButton("split", function(e){parent.split(index);}, newElement, "split axes to sliders"); //split into separate sliders
+			addButton("swap", function(e){parent.swap(index);}, newElement, "swap x & y axes"); // swap axes
+			addButton("invertX", function(e){parent.invert(index, "x");}, newElement, "invert x axis"); // invert x axis
+			addButton("invertY", function(e){parent.invert(index, "y");}, newElement, "invert y axis"); //invert y axis
 		} else {
-			if(index>0 && sliders[index-1].data.properties.orientation != "pane"){addButton("comPrev", function(e){parent.combine(index,-1);}, newElement);} //combine prev
-			if(index < parent.properties.configuration.length-1 && sliders[index+1].data.properties.orientation != "pane"){addButton("comNext", function(e){parent.combine(index,1);}, newElement);}//combine next
-			addButton((parent.properties.orientation=="horizontal")?"invertY":"invertX", function(e){parent.invert(index);}, newElement);
+			if(index>0 && sliders[index-1].data.properties.orientation != "pane"){addButton("comPrev", function(e){parent.combine(index,-1);}, newElement, "combine with previous slider");} //combine prev
+			if(index < parent.properties.configuration.length-1 && sliders[index+1].data.properties.orientation != "pane"){addButton("comNext", function(e){parent.combine(index,1);}, newElement, "combine with next slider");}//combine next
+			addButton((parent.properties.orientation=="horizontal")?"invertY":"invertX", function(e){parent.invert(index);}, newElement, "invert axis");
 		}
-		if(index>0){addButton("movePrev", function(e){parent.move(index, -1);}, newElement);} //move prev
-		if(index < parent.properties.configuration.length-1){addButton("moveNext", function(e){parent.move(index, 1);}, newElement);}//move next
+		if(index>0){addButton("movePrev", function(e){parent.move(index, -1);}, newElement, "swap with previous");} //move prev
+		if(index < parent.properties.configuration.length-1){addButton("moveNext", function(e){parent.move(index, 1);}, newElement, "swap with next");}//move next
 	});
 }
 multiSliderWidget.prototype.configToArray = function(){
@@ -1316,6 +1344,12 @@ hslWidget.prototype.onUpdate = function(){
 		var sat = this.value[this.properties.parameters.indexOf("saturation")];
 		hue = this.properties.color.HSVtoRGB(hue, sat/100, 0.5);
 		lightSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
+	}
+	var satlightSlider = this.element.querySelector(".type-lightness-saturation, .type-saturation-lightness");
+	if(satlightSlider != null){
+		var hue = this.value[this.properties.parameters.indexOf("hue")];
+		hue = this.properties.color.HSVtoRGB(hue, 1, 1);
+		satlightSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
 	}
 }
 
