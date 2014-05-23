@@ -483,80 +483,28 @@ configWidget.prototype.initialize = function(){
 configWidget.prototype.configureSelf = function() {
 	//this is effectively a re-initialization after certain properties and members have been altered
 }
+configWidget.prototype.insertElement = function(type, element, classes, onPress){
+	var thisElement = document.createElement(type);
+	if(classes != undefined){
+		if(classes instanceof Array){
+			classes.forEach(function(thisClass){
+				thisElement.classList.add(thisClass);
+			});
+		} else {
+			thisElement.classList.add(classes);
+		}
+	}
+	if(onPress != undefined){
+		thisElement.addEventListener("click", onPress);
+	}
+	element.insertBefore(thisElement, element.children[element.children.length]);
+}
+configWidget.buildOverlay = function(){
+
+}
 configWidget.prototype.showConfig = function(configBuilder){
 	//displays any default configuration options
 	this.configOn = true;
-	//encapsulated functionality
-	var helpers = {
-		addButton:function(htmlClass, element, onPress){
-			var thisButton = document.createElement("button");
-			thisButton.classList.add(htmlClass);
-			if(onPress != undefined){
-				thisButton.addEventListener("click", onPress);
-			}
-			element.insertBefore(thisButton, element.children[element.children.length]);
-		},
-		buildOverlay:function(htmlClasses, element, overlayBuider, onPress){
-			var thisOverlay = document.createElement("div");
-			htmlClasses.forEach(function(thisClass){
-				thisOverlay.classList.add(thisClass);
-			});
-			if(onPress != undefined){
-				thisOverlay.addEventListener("click", onPress);
-			}
-			if(overlayBuilder != undefined){
-				overlayBuilder();
-			}
-			
-		}
-	};
-	if(configBuilder != undefined){
-		configBuilder.call(helpers);
-	}
-	//functionality
-	//set configOn to true (useful for callbacks)
-	//get objects we'll be setting configs on
-	//helper *add button* function
-	
-	//basic flow should after that is, select a group of object and build the overlay for them
-	//building an overlay consists of: creating an element, adding classes, adding click event handlers(?), adding buttons, and inserting it into the dom
-	/*
-	this.configOn = true;
-	var parent = this, sliders = parent.element.querySelectorAll("[data-class=sliderWidget]");
-	var addButton = function(htmlClass, onPress, element){
-		var thisButton = document.createElement("button");
-		thisButton.classList.add(htmlClass);
-		thisButton.addEventListener("click", onPress);
-		element.insertBefore(thisButton, element.children[element.children.length]);
-	}
-	var configOverlay = document.createElement("div");
-	configOverlay.classList.add("multiOverlay");
-	addButton("rotate",function(e){parent.rotate();e.preventDefault();e.stopPropagation();}, configOverlay);
-	parent.element.insertBefore(configOverlay, parent.element.children[0]);
-	this.properties.configuration.forEach(function(value, index){
-		//get the associated slider
-		thisSlider = sliders[index].data;
-		var newElement = document.createElement("div");
-		newElement.classList.add("overlay");
-		newElement.classList.add(parent.properties.orientation);
-		thisSlider.element.insertBefore(newElement, thisSlider.element.children[0]);
-		// move this functionality into it's own handler so it's easier to find
-		newElement.addEventListener("mousedown",function(e){e.preventDefault();e.stopPropagation();if(e.button == 2){parent.configOn = false;parent.saveSettings();parent.configureSelf();}return false;});
-		//build the necessary config buttons for this element
-		if(thisSlider.properties.orientation == "pane"){
-			addButton("split", function(e){parent.split(index);}, newElement); //split into separate sliders
-			addButton("swap", function(e){parent.swap(index);}, newElement); // swap axes
-			addButton("invertX", function(e){parent.invert(index, "x");}, newElement); // invert x axis
-			addButton("invertY", function(e){parent.invert(index, "y");}, newElement); //invert y axis
-		} else {
-			if(index>0 && sliders[index-1].data.properties.orientation != "pane"){addButton("comPrev", function(e){parent.combine(index,-1);}, newElement);} //combine prev
-			if(index < parent.properties.configuration.length-1 && sliders[index+1].data.properties.orientation != "pane"){addButton("comNext", function(e){parent.combine(index,1);}, newElement);}//combine next
-			addButton((parent.properties.orientation=="horizontal")?"invertY":"invertX", function(e){parent.invert(index);}, newElement);
-		}
-		if(index>0){addButton("movePrev", function(e){parent.move(index, -1);}, newElement);} //move prev
-		if(index < parent.properties.configuration.length-1){addButton("moveNext", function(e){parent.move(index, 1);}, newElement);}//move next
-	});
-	*/
 }
 configWidget.prototype.getSettings = function(){
 	var thisConstructor = this.constructor.name,
@@ -678,6 +626,8 @@ sliderWidget.prototype.start = function(){
 	widget.prototype.start.call(this);
 	if(this.properties.orientation == "pane"){
 		this.setHeight();
+		//bind it to resize
+		this.element.onresize = function(){console.log("Resize")};
 	}
 }
 sliderWidget.prototype.setHeight = function(val){
@@ -1144,13 +1094,13 @@ multiSliderWidget.prototype.onClick = function(event){
 			}
 			break;
 	}
-	return false;
+	//return false;
 }
 //move some functionality to configWidget
 multiSliderWidget.prototype.showConfig = function(){
-	var delegate = function(){debugger;};
-	configWidget.prototype.showConfig.call(this, delegate);
-	this.configOn = true;
+	//var delegate = function(){debugger;};
+	configWidget.prototype.showConfig.call(this);
+	//this.configOn = true;
 	var parent = this, sliders = parent.element.querySelectorAll("[data-class=sliderWidget]");
 	var addButton = function(htmlClass, onPress, element, tooltip){
 		var thisButton = document.createElement("button");
