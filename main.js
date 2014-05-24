@@ -413,6 +413,7 @@ widget.prototype.getPropertiesString = function () {
 		return propertiesString;
 	}
 }
+//are these necessary?
 widget.prototype.getClasses = function () {
 	return this.element.className.split(" ");
 }
