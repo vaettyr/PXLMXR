@@ -234,6 +234,7 @@ var Application = {
 };
 
 //base abstract class to base all widgets on
+//TODO: replace
 function widget(element) {
 	this.element = element;
 };
@@ -480,10 +481,74 @@ configWidget.prototype.initialize = function(){
 	this.loadSettings();
 	widget.prototype.initialize.call(this);
 	//spawn members and initialize them
+	var parent = this;
+	this.element.addEventListener("contextmenu", function(){parent.onContextMenu.call(parent, event);});
 }
 configWidget.prototype.configureSelf = function() {
 	//this is effectively a re-initialization after certain properties and members have been altered
 }
+configWidget.prototype.onContextMenu = function(event){
+	event.preventDefault();
+	var options = this.getContextOptions(event.target);
+	if (options.length <1){return;}
+	var contextmenu = document.createElement("div");
+	contextmenu.classList.add("contextmenu");
+	//add a display
+	var label = document.createElement("h4"), 
+	labeltext = (event.target.data.properties.type)?event.target.data.properties.type:event.target.data.constructor.name;
+	label.innerHTML = labeltext;
+	contextmenu.insertBefore(label, contextmenu.children.length);
+	//add the options to the menu
+	options.forEach(function(option){
+		if(option instanceof Object){
+			var thisOption = document.createElement("a");
+			thisOption.innerHTML = option.name;
+			thisOption.addEventListener("click", option.operator);
+			contextmenu.insertBefore(thisOption, contextmenu.children.length);
+		} else {
+			var thisBreak = document.createElement("hr");
+			contextmenu.insertBefore(thisBreak, contextmenu.children.length);
+		}
+	});
+	//see if this will go off the sides of the display
+	contextmenu.style.left = event.pageX+"px";
+	contextmenu.style.top = event.pageY+"px";
+	document.body.insertBefore(contextmenu, document.body.children[0]);
+	if(event.pageX + contextmenu.offsetWidth > window.innerWidth){contextmenu.style.left = (event.pageX - contextmenu.offsetWidth)+"px";}
+	if(event.pageY + contextmenu.offsetHeight > window.innerHeight){contextmenu.style.top = (event.pageY - contextmenu.offsetHeight)+"px";}
+	//block standard mouse events while context menu is open
+	var intercept = document.createElement("div"),
+	parent = this;
+	intercept.classList.add("intercept");
+	document.body.insertBefore(intercept, document.body.children[0]);
+	intercept.addEventListener("mouseover", this.ignoreMouseEvents);
+	intercept.addEventListener("mouseout", this.ignoreMouseEvents);
+	intercept.addEventListener("mousemove", this.ignoreMouseEvents);
+	intercept.addEventListener("mousedown", function(e){parent.closeContextMenu.call(parent, e)});
+	intercept.addEventListener("mouseup", function(e){parent.closeContextMenu.call(parent, e)});
+	intercept.addEventListener("click", function(e){parent.closeContextMenu.call(parent, e)});
+	intercept.addEventListener("contextmenu", function(e){parent.closeContextMenu.call(parent, e)});
+	intercept.addEventListener("dblclick", function(e){parent.closeContextMenu.call(parent, e)});
+}
+configWidget.prototype.getContextOptions = function(target){
+	// returns an array of objects. Each object has a name and a function
+	var options = [];
+	// default config widget options should be resize and relocate
+	return options;
+}
+configWidget.prototype.ignoreMouseEvents = function(e){
+	e.preventDefault();
+	e.stopImmediatePropagation();
+	return false;
+}
+configWidget.prototype.closeContextMenu = function(e){
+	this.ignoreMouseEvents(e);
+	var contextmenu = document.querySelector(".contextmenu"),
+	intercept = document.querySelector(".intercept");
+	document.body.removeChild(contextmenu);
+	document.body.removeChild(intercept);
+}
+//TODO: begin remove
 configWidget.prototype.insertElement = function(type, element, classes, onPress){
 	var thisElement = document.createElement(type);
 	if(classes != undefined){
@@ -507,6 +572,7 @@ configWidget.prototype.showConfig = function(configBuilder){
 	//displays any default configuration options
 	this.configOn = true;
 }
+//TODO: end remove
 configWidget.prototype.getSettings = function(){
 	var thisConstructor = this.constructor.name,
 	thisSettings = window.localStorage.getItem(thisConstructor);
@@ -1054,92 +1120,43 @@ multiSliderWidget.prototype.configureSelf = function(){
 		pIndex++;
 	});
 	parent.setValues();
-	parent.element.addEventListener("mousedown", parent.onClick, false);
 }
-//move some functionality to configWidget
-multiSliderWidget.prototype.onClick = function(event){
-	//maybe add a left-click while active to bring up the multi-widget config options
-	switch(event.button){
-		case 0:
-			if(this.data.configOn){
-				var overlay = this.querySelector(".multiOverlay");
-				if(overlay != null){
-					var height = overlay.style['z-index'];
-					if(height && height > 0)
-					{
-						if(event.target && event.target.tagName != "BUTTON"){
-							overlay.style.cssText = null;
-							event.preventDefault();
-							event.stopPropagation();
-						}
-					} else {
-						overlay.style['z-index'] = 5000;
-						overlay.style.background = "rgba(75, 120, 150, 0.8)";
-						event.preventDefault();
-						event.stopPropagation();
-					}
-				}
-			}
-			break;
-		case 2:
-			this.data.configOn = !this.data.configOn;
-			if(this.data.configOn){
-				this.data.showConfig();
-				event.preventDefault();
-				event.stopPropagation();
+multiSliderWidget.prototype.getContextOptions = function(target){
+	var options = [],
+	index = Array.prototype.indexOf.call(this.element.children, target),
+	next = (this.properties.orientation == "horizontal")?"right":"down",
+	previous = (this.properties.orientation == "horizontal")?"left":"up",
+	parent = this;
+	switch(target.data.constructor.name){
+		case "sliderWidget":
+			if(target.data.properties.orientation == "pane"){
+				options.push({name:"Split X & Y axes", operator:function(){parent.split(index); parent.closeContextMenu(event);}});
+				options.push({name:"Swap X & Y axes", operator:function(){parent.swap(index); parent.closeContextMenu(event);}});
+				options.push({name:"Invert X axis", operator:function(){parent.invert(index, "x"); parent.closeContextMenu(event);}});
+				options.push({name:"Invert Y axis", operator:function(){parent.invert(index, "y"); parent.closeContextMenu(event);}});
 			} else {
-				this.data.saveSettings();
-				this.data.configureSelf();
-				event.preventDefault();
-				event.stopPropagation();
+				if(index > 0 && this.element.children[index-1].data && this.element.children[index-1].data.properties.orientation != "pane"){
+					options.push({name:"Combine with previous", operator:function(){parent.combine(index, -1); parent.closeContextMenu(event);}});
+				}
+				if(index < this.properties.configuration.length-1 && this.element.children[index+1].data && this.element.children[index+1].data.properties.orientation != "pane"){
+					options.push({name:"Combine with next", operator:function(){parent.combine(index, 1); parent.closeContextMenu(event);}});
+				}
+				options.push({name: "Invert Axis", operator:function(){parent.invert(index); parent.closeContextMenu(event);}});
 			}
+			
+		default:
+			if(options.length>1){options.push("break");}
+			if(index > 0) {
+				options.push({name: "Move "+previous, operator:function(){parent.move(index, -1); parent.closeContextMenu(event);}});
+			}
+			if(index < this.properties.configuration.length-1){
+				options.push({name: "Move "+next, operator:function(){parent.move(index, 1); parent.closeContextMenu(event);}});
+			}
+			options.push("break");
+			options.push({name: "Rotate", operator:function(){parent.rotate(); parent.closeContextMenu(event);}});
 			break;
 	}
-	//return false;
-}
-//move some functionality to configWidget
-multiSliderWidget.prototype.showConfig = function(){
-	//var delegate = function(){debugger;};
-	configWidget.prototype.showConfig.call(this);
-	//this.configOn = true;
-	var parent = this, sliders = parent.element.querySelectorAll("[data-class=sliderWidget]");
-	var addButton = function(htmlClass, onPress, element, tooltip){
-		var thisButton = document.createElement("button");
-		thisButton.classList.add(htmlClass);
-		thisButton.addEventListener("click", onPress);
-		element.insertBefore(thisButton, element.children[element.children.length]);
-		//add a tooltip to go with it
-		if(tooltip != undefined){
-			thisButton.insertBefore(document.createElement("span"),thisButton.children[element.children.length]).innerHTML = tooltip;
-		}
-	}
-	var configOverlay = document.createElement("div");
-	configOverlay.classList.add("multiOverlay");
-	addButton("rotate",function(e){parent.rotate();e.preventDefault();e.stopPropagation();}, configOverlay, "change orientation");
-	parent.element.insertBefore(configOverlay, parent.element.children[0]);
-	this.properties.configuration.forEach(function(value, index){
-		//get the associated slider
-		thisSlider = sliders[index].data;
-		var newElement = document.createElement("div");
-		newElement.classList.add("overlay");
-		newElement.classList.add(parent.properties.orientation);
-		thisSlider.element.insertBefore(newElement, thisSlider.element.children[0]);
-		// move this functionality into it's own handler so it's easier to find
-		newElement.addEventListener("mousedown",function(e){e.preventDefault();e.stopPropagation();if(e.button == 2){parent.configOn = false;parent.saveSettings();parent.configureSelf();}return false;});
-		//build the necessary config buttons for this element
-		if(thisSlider.properties.orientation == "pane"){
-			addButton("split", function(e){parent.split(index);}, newElement, "split axes to sliders"); //split into separate sliders
-			addButton("swap", function(e){parent.swap(index);}, newElement, "swap x & y axes"); // swap axes
-			addButton("invertX", function(e){parent.invert(index, "x");}, newElement, "invert x axis"); // invert x axis
-			addButton("invertY", function(e){parent.invert(index, "y");}, newElement, "invert y axis"); //invert y axis
-		} else {
-			if(index>0 && sliders[index-1].data.properties.orientation != "pane"){addButton("comPrev", function(e){parent.combine(index,-1);}, newElement, "combine with previous slider");} //combine prev
-			if(index < parent.properties.configuration.length-1 && sliders[index+1].data.properties.orientation != "pane"){addButton("comNext", function(e){parent.combine(index,1);}, newElement, "combine with next slider");}//combine next
-			addButton((parent.properties.orientation=="horizontal")?"invertY":"invertX", function(e){parent.invert(index);}, newElement, "invert axis");
-		}
-		if(index>0){addButton("movePrev", function(e){parent.move(index, -1);}, newElement, "swap with previous");} //move prev
-		if(index < parent.properties.configuration.length-1){addButton("moveNext", function(e){parent.move(index, 1);}, newElement, "swap with next");}//move next
-	});
+	return options;
 }
 multiSliderWidget.prototype.configToArray = function(){
 	var totalConfig = [], pIndex = 0, parent = this;
@@ -1171,27 +1188,27 @@ multiSliderWidget.prototype.move = function(index, direction){
 	totalConfig[index] = totalConfig.splice(index+direction, 1, totalConfig[index])[0];
 	this.arrayToConfig(totalConfig);
 	this.configureSelf();
-	this.showConfig();
+	this.saveSettings();
 }
 multiSliderWidget.prototype.combine = function(index, direction){
 	var totalConfig = this.configToArray();
 	totalConfig.splice((direction>0)?index:index+direction,2,{orientation:"pane",type:[totalConfig[index].type[0],totalConfig[index+direction].type[0]]});
 	this.arrayToConfig(totalConfig);
 	this.configureSelf();
-	this.showConfig();
+	this.saveSettings();
 }
 multiSliderWidget.prototype.split = function(index){
 	var thisOrientation = (this.properties.orientation == "horizontal")?"vertical":"horizontal";
 	this.settings.configuration.splice(index, 1, thisOrientation, thisOrientation);
 	this.configureSelf();
-	this.showConfig();
+	this.saveSettings();
 }
 multiSliderWidget.prototype.swap = function(index){
 	var totalConfig = this.configToArray();
 	totalConfig[index].type = [totalConfig[index].type[1],totalConfig[index].type[0]];
 	this.arrayToConfig(totalConfig);
 	this.configureSelf();
-	this.showConfig();
+	this.saveSettings();
 }
 multiSliderWidget.prototype.invert = function(index, axis){
 	this.element.querySelectorAll("[data-class=sliderWidget]")[index].data.invertAxis(axis);
@@ -1199,6 +1216,7 @@ multiSliderWidget.prototype.invert = function(index, axis){
 	if(this.settings.invertYConfig == undefined){this.settings.invertYConfig = new Array(this.settings.configuration.length);}
 	if(axis == undefined || axis.toUpperCase() != "Y"){this.settings.invertXConfig[index] = !this.settings.invertXConfig[index];}
 	if(axis == undefined || axis.toUpperCase() != "X"){this.settings.invertYConfig[index] = !this.settings.invertYConfig[index];}
+	this.saveSettings();
 }
 multiSliderWidget.prototype.rotate = function(){
 	var parent = this, flipSlider = function(){
@@ -1218,10 +1236,7 @@ multiSliderWidget.prototype.rotate = function(){
 		flipSlider();
 	}
 	this.configureSelf();
-	this.showConfig();
-	var overlay = this.element.querySelector(".multiOverlay");
-	overlay.style['z-index'] = 5000;
-	overlay.style.background = "rgba(75, 120, 150, 0.8)";
+	this.saveSettings();
 }
 
 //some saved configurations of a multiSliderWidget
@@ -1306,13 +1321,18 @@ hslWidget.prototype.onUpdate = function(){
 
 //color picker
 function colorPickerWidget (element) {
-	widget.call(this, element);
+	configWidget.call(this, element);
 	this.members = [
-	    { className:"sliderWidget", name:"satValPane", 
-	        properties:{orientation:"pane",type:"sat-val"}},
-	    { className:"sliderWidget", name:"hueSlider", 
-	        properties:{orientation:"vertical",type:"hue" }}
+	    { className:"hsvWidget", name:"hsv"},
+	    { className:"rgbWidget", name:"rgb"}
 	    ];
+	this.properties = {
+		orientation:"horizontal",
+		parameters:[]
+	};
 }
-colorPickerWidget.prototype = new widget();
+colorPickerWidget.prototype = new configWidget();
 colorPickerWidget.prototype.constructor = colorPickerWidget;
+colorPickerWidget.prototype.onUpdate = function(){
+	console.log("blah");
+}
