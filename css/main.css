@@ -27,7 +27,14 @@ label:after
 {
 	content:":";
 }
-
+.context-menu
+{
+	background:white;
+	border-radius:0.5em;
+	padding: 0.5em;
+	position:fixed;
+	z-index:10000;
+}
 .overlay, .multiOverlay
 {
 	display:flex;
