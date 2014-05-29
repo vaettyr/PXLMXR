@@ -60,7 +60,7 @@ label:after
 }
 .intercept
 {
-	position:fixed;
+	position:absolute;
 	top:0;
 	left:0;
 	right:0;
@@ -68,126 +68,12 @@ label:after
 	z-index:9000;
 	background:rgba(50, 120, 150, 0.2);
 }
-.overlay, .multiOverlay
+.resize
 {
-	display:flex;
 	position:absolute;
-	height:100%;
-	width:100%;
-	z-index:2000;
-	background:rgba(75,120,150, 0.35);
-	transition: background 200ms;
-	border-radius:0.5em;
-}
-.multiOverlay{z-index:0}
-.overlay:hover
-{
-	background:rgba(75,120,150, 0.75);
-}
-.overlay.horizontal
-{
-	flex-direction:column;
-}
-.overlay.vertical
-{
-	flex-direction:row;
-}
-.overlay > button:hover
-{
-	opacity:1;
-}
-.overlay>button>span, .multiOverlay>button>span
-{
-	position:fixed;
-	margin-left:2em;
-	background:rgb(120,150,200);
-	padding:0.3em;
-	border-radius:0.5em;
-	display:none;
-	opacity:0;
-	transition:opacity 200ms;
-}
-.overlay>button:hover>span, .multiOverlay>button:hover>span
-{
-	display:inline;
-	opacity:1;
-	transition:opacity 200ms;
-}
-.overlay > button
-{
-	flex:1 1 auto;
-	max-width:2em;
-	max-height:2em;
-	border:none;
-	background:rgb(120,150,200);
-	border-radius:0.5em;
-	color:white;
-	margin:0.2em;
-	overflow:hidden;
-	white-space:nowrap;
-	opacity:0.3;
-	transition:opacity 100ms;
-	background-size:contain;
-}
-.multiOverlay > button:hover
-{
-	opacity:1;
-}
-.multiOverlay > button
-{
-	width:4em;
-	height:4em;
-	border:none;
-	background:rgb(140, 180, 220);
-	border-radius:0.5em;
-	color:white;
-	margin:0.4em;
-	overflow:hidden;
-	white-space:nowrap;
-	opacity:0.4;
-	transition:opacity 100ms;
-	background-size:contain;
-}
-button.invertY{
-	background-image:url(img/doublearrow-opp-y.png);
-}
-button.invertX{
-	background-image:url(img/doublearrow-opp-x.png);
-}
-button.swap{
-	background-image:url(img/arrow-swap-axes.png);
-}
-button.split{
-	background-image:url(img/arrow-break-axes.png);
-}
-button.rotate{
-	background-image:url(img/arrow-rot-right.png);
-}
-.vertical>button.movePrev{
-	background-image:url(img/arrow-single-up.png);
-}
-.vertical>button.moveNext{
-	background-image:url(img/arrow-single-down.png);
-}
-.vertical>button.comPrev{
-	background-image:url(img/arrow-double-up.png);
-}
-.vertical>button.comNext{
-	background-image:url(img/arrow-double-down.png);
-}
-.horizontal>button.movePrev{
-	background-image:url(img/arrow-single-left.png);
-	float:right;
-}
-.horizontal>button.moveNext{
-	background-image:url(img/arrow-single-right.png);
-	float:left;
-}
-.horizontal>button.comPrev{
-	background-image:url(img/arrow-double-left.png);
-}
-.horizontal>button.comNext{
-	background-image:url(img/arrow-double-right.png);
+	bottom:0;
+	right:0;
+	z-index:10000;
 }
 /*this should always be overriden*/
 /*this should always be overriden*/
@@ -404,6 +290,32 @@ button.rotate{
 {
 	display:flex;
 }
+.colorPickerWidget
+{
+	display:inline-flex !important;
+}
+.colorPickerWidget.orientation-vertical > .rgbWidget,
+.colorPickerWidget.orientation-vertical > .hsvWidget,
+.colorPickerWidget.orientation-vertical > .hslWidget
+{
+	width:auto !important;
+	min-width:initial !important;
+	max-width:initial !important;
+}
+.colorPickerWidget.orientation-horizontal > .rgbWidget,
+.colorPickerWidget.orientation-horizontal > .hsvWidget,
+.colorPickerWidget.orientation-horizontal > .hslWidget
+{
+	height: auto !important;
+	min-height:initial !important;
+	max-height: initial !important;
+}
+.rgbWidget>.widget.orientation-horizontal,
+.hsvWidget>.widget.orientation-horizontal,
+.hslWidget>.widget.orientation-horizontal
+{
+	max-height:2em;
+}
 .orientation-horizontal
 {
 	flex-direction:row;
@@ -416,6 +328,14 @@ button.rotate{
 	display:flex;
 	flex: 1 1 auto;
 }
+.orientation-vertical, .orientation-horizontal
+{
+	justify-content:space-between;
+}
+.orientation-vertical>*,.orientation-horizontal>*
+{
+	order:1;
+}
 .ioSliderWidget.orientation-pane
 {
 	flex-wrap:wrap;
@@ -427,7 +347,10 @@ button.rotate{
 	height:auto;
 	max-width:2em;
 }
-
+.sliderWidget.orientation-horizontal
+{
+	max-height:2em;
+}
 .ioSliderWidget.orientation-vertical
 {
 	display:inline-flex;
@@ -460,6 +383,8 @@ button.rotate{
 	width:5em;
 	height:5em;
 	border-radius:0.5em;
+	position:initial;
+	/*background:black;*/
 }
 
 input.ioWidget , input.ioWidget:focus

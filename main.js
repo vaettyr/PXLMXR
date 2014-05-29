@@ -244,7 +244,7 @@ widget.prototype.initialize = function(){
 	 var htmlAttributes = this.element.attributes;
 	 for(var index in htmlAttributes){
 		if(htmlAttributes[index].name!=undefined && htmlAttributes[index].name.match(/^data-(?!class)/i)){
-			var content = this.parseHTML(htmlAttributes[index].value),
+			var content = JSON.parse(htmlAttributes[index].value),
 			attribute = htmlAttributes[index].name.slice(5);
 			if(attribute=="members"){content = JSON.parse(htmlAttributes[index].value);}
 			if(this[attribute] == undefined || typeof content != "object" || content instanceof Array){
@@ -289,7 +289,7 @@ widget.prototype.initialize = function(){
 				//write members out using JSON
 				if(attribute != "tag" && attribute != "className" && attribute != "attributes" && attribute != "settings" && attribute != "members" && thisMember[attribute]){
 					html += "data-"+attribute+"='";
-					html += this.toHTML(thisMember[attribute])+"'";
+					html += JSON.stringify(thisMember[attribute])+"'";
 				}
 				if(attribute == "members"){
 					html += "data-members='";
@@ -311,74 +311,6 @@ widget.prototype.initialize = function(){
 		}
 	 }
 };
-widget.prototype.parseHTML = function(html){
-	var parsed;
-	var parseInnerHTML = function(element){
-		var thisValue;
-		if(element.trim().indexOf(":") >= 0){
-			//object
-			thisValue = {};
-			element = element.trim().split(";");
-			for(var index in element){
-				var pair = element[index].split(":");
-				if(pair[0] != ""){
-					thisValue[pair[0]] = pair[1];
-				}
-			}
-		} else if(element.trim().indexOf(" ") >= 0){
-			//array
-			thisValue = element.trim().split(" ");
-		} else {
-			//string
-			thisValue = element.trim();
-		}
-		return thisValue;
-	}
-	if(html.indexOf(",")>=0){
-		parsed = [];
-		html = html.split(",");
-		html.forEach(function(element){
-			parsed.push(parseInnerHTML(element));
-		});
-	} else {
-		parsed = parseInnerHTML(html);
-	}
-	return parsed;
-}
-widget.prototype.toHTML = function(element){
-	//takes an object (probably from this.members) and formats it as an html element
-	var html = "";
-	//can output arrays, strings, objects
-	var toInnerHTML = function(elem){
-		var thisHTML = "";
-		if(elem instanceof Object){
-			for(var key in elem){
-				if(elem[key] instanceof Array){
-					thisHTML += key+":"+toInnerHTML(elem[key])+";";
-				} else {
-					thisHTML += key+":"+elem[key]+";";
-				}
-			}
-		} else if (elem instanceof Array){
-			elem.forEach(function(value, index){
-				if(index>0){thisHTML += " ";}
-				thisHTML += value;
-			});
-		} else {
-			thisHTML += elem;
-		}
-		return thisHTML;
-	}
-	if(element instanceof Array){
-		element.forEach(function(value, index){
-			if(index>0){html += ",";}
-			html += toInnerHTML(value);
-		});
-	} else {
-		html = toInnerHTML(element);
-	}
-	return html;
-}
 widget.prototype.postInitialize = function(){
 	for(var index in this.element.attributes){
 		var thisName = this.element.attributes[index].name;
@@ -399,7 +331,7 @@ widget.prototype.start = function(){
 }
 widget.prototype.onUpdate = function(){
 	var parent = this.element.parentNode.data;
-	parent && parent.onUpdate && parent.onUpdate.call(this);
+	parent && parent.onUpdate && parent.onUpdate.call(parent);
 }
 widget.prototype.getPropertiesString = function () {
 	if(this.properties != undefined){
@@ -469,6 +401,7 @@ function configWidget(element){
 configWidget.prototype = new widget();
 configWidget.prototype.constructor = configWidget;
 configWidget.prototype.initialize = function(){
+	//widget.prototype.initialize.call(this);
 	// get settings
 	var thisSettings = this.getSettings();
 	if(thisSettings){
@@ -479,6 +412,13 @@ configWidget.prototype.initialize = function(){
 	}
 	// push settings to properties
 	this.loadSettings();
+	this.element.setAttribute("data-properties", JSON.stringify(this.properties));
+	if(this.properties.style){
+		for(var thisStyle in this.properties.style){
+			this.element.style[thisStyle] = this.properties.style[thisStyle];
+		}
+	}
+	//this.element.setAttribute("style", this.properties.style);
 	widget.prototype.initialize.call(this);
 	//spawn members and initialize them
 	var parent = this;
@@ -486,6 +426,22 @@ configWidget.prototype.initialize = function(){
 }
 configWidget.prototype.configureSelf = function() {
 	//this is effectively a re-initialization after certain properties and members have been altered
+	//add style to this object
+	if(this.properties && this.properties.style){
+		for(var thisStyle in this.properties.style){
+			this.element.style[thisStyle] = this.properties.style[thisStyle];
+		}
+	}	
+}
+configWidget.prototype.addIntercept = function(target){
+	var parent = this,
+	intercept = document.createElement("div");
+	intercept.classList.add("intercept");
+	target.insertBefore(intercept, target.children[0]);
+	intercept.addEventListener("mouseover", this.ignoreMouseEvents);
+	intercept.addEventListener("mouseout", this.ignoreMouseEvents);
+	intercept.addEventListener("mousemove", this.ignoreMouseEvents);
+	return intercept;
 }
 configWidget.prototype.onContextMenu = function(event){
 	event.preventDefault();
@@ -506,24 +462,27 @@ configWidget.prototype.onContextMenu = function(event){
 				thisOption.addEventListener("click", option.operator);
 				contextmenu.insertBefore(thisOption, contextmenu.children.length);
 			} else {
-				var thisBreak = document.createElement("hr");
-				contextmenu.insertBefore(thisBreak, contextmenu.children.length);
+				if(option == "break"){
+					var thisBreak = document.createElement("hr");
+					contextmenu.insertBefore(thisBreak, contextmenu.children.length);
+				} else {
+					var thisTitle = document.createElement("h4");
+					thisTitle.innerHTML = option;
+					contextmenu.insertBefore(thisTitle, contextmenu.children.length);
+				}
 			}
 		});
 		//see if this will go off the sides of the display
-		contextmenu.style.left = event.pageX+"px";
-		contextmenu.style.top = event.pageY+"px";
+		contextmenu.style.left = event.clientX+"px";
+		contextmenu.style.top = event.clientY+"px";
 		document.body.insertBefore(contextmenu, document.body.children[0]);
-		if(event.pageX + contextmenu.offsetWidth > window.innerWidth){contextmenu.style.left = (event.pageX - contextmenu.offsetWidth)+"px";}
-		if(event.pageY + contextmenu.offsetHeight > window.innerHeight){contextmenu.style.top = (event.pageY - contextmenu.offsetHeight)+"px";}
+		//debugger;
+		if(event.clientX + contextmenu.offsetWidth > window.innerWidth){contextmenu.style.left = (event.clientX - contextmenu.offsetWidth)+"px";}
+		if(event.clientY + contextmenu.offsetHeight > window.innerHeight){contextmenu.style.top = (event.clientY - contextmenu.offsetHeight)+"px";}
 		//block standard mouse events while context menu is open
-		var intercept = document.createElement("div"),
-		parent = this;
-		intercept.classList.add("intercept");
-		document.body.insertBefore(intercept, document.body.children[0]);
-		intercept.addEventListener("mouseover", this.ignoreMouseEvents);
-		intercept.addEventListener("mouseout", this.ignoreMouseEvents);
-		intercept.addEventListener("mousemove", this.ignoreMouseEvents);
+		var intercept = this.addIntercept(document.body);
+		parent.closeRef = function(e){parent.closeContextMenu.call(parent, e);};
+		document.addEventListener("scroll", parent.closeRef);
 		intercept.addEventListener("mousedown", function(e){parent.closeContextMenu.call(parent, e)});
 		intercept.addEventListener("mouseup", function(e){parent.closeContextMenu.call(parent, e)});
 		intercept.addEventListener("click", function(e){parent.closeContextMenu.call(parent, e)});
@@ -534,8 +493,15 @@ configWidget.prototype.onContextMenu = function(event){
 }
 configWidget.prototype.getContextOptions = function(target){
 	// returns an array of objects. Each object has a name and a function
-	var options = [];
+	var options = []
+	parent = this;
 	// default config widget options should be resize and relocate
+	if(this.properties.Resizeable){
+		options.push({name:"Resize",operator:function(){target.resize();parent.closeContextMenu(event);}});
+	}
+	if(this.properties.Relocatable){
+		options.push({name:"Relocate",operator:function(){target.relocate();parent.closeContextMenu(event);}});
+	}
 	return options;
 }
 configWidget.prototype.ignoreMouseEvents = function(e){
@@ -549,32 +515,8 @@ configWidget.prototype.closeContextMenu = function(e){
 	intercept = document.querySelector(".intercept");
 	document.body.removeChild(contextmenu);
 	document.body.removeChild(intercept);
+	document.removeEventListener("scroll", this.closeRef);
 }
-//TODO: begin remove
-configWidget.prototype.insertElement = function(type, element, classes, onPress){
-	var thisElement = document.createElement(type);
-	if(classes != undefined){
-		if(classes instanceof Array){
-			classes.forEach(function(thisClass){
-				thisElement.classList.add(thisClass);
-			});
-		} else {
-			thisElement.classList.add(classes);
-		}
-	}
-	if(onPress != undefined){
-		thisElement.addEventListener("click", onPress);
-	}
-	element.insertBefore(thisElement, element.children[element.children.length]);
-}
-configWidget.buildOverlay = function(){
-
-}
-configWidget.prototype.showConfig = function(configBuilder){
-	//displays any default configuration options
-	this.configOn = true;
-}
-//TODO: end remove
 configWidget.prototype.getSettings = function(){
 	var thisConstructor = this.constructor.name,
 	thisSettings = window.localStorage.getItem(thisConstructor);
@@ -600,6 +542,74 @@ configWidget.prototype.loadSettings = function(){
 		return true;
 	}
 	return false;
+}
+configWidget.prototype.resize = function(){
+	//add the interceptor
+	var intercept = this.addIntercept(this.element);
+	intercept.addEventListener("mousedown", this.ignoreMouseEvents);
+	intercept.addEventListener("mouseup", this.ignoreMouseEvents);
+	intercept.addEventListener("click", this.ignoreMouseEvents);
+	intercept.addEventListener("contextmenu", this.ignoreMouseEvents);
+	intercept.addEventListener("dblclick", this.ignoreMouseEvents);
+	//add interceptor killers
+	var removeInterceptor = function(){
+		var interceptor = document.querySelector(".intercept")
+		resizor = document.querySelector(".resize");
+		if(interceptor){interceptor.parentNode.removeChild(interceptor);}
+		if(resizor){resizor.parentNode.removeChild(resizor);}
+		document.removeEventListener("mousedown", arguments.callee);
+	};
+	document.addEventListener("mousedown", removeInterceptor);
+	//add the resize button
+	var parent = this;
+	resizor = document.createElement("button");
+	resizor.innerHTML = "RESIZE";
+	resizor.classList.add("resize");
+	this.element.insertBefore(resizor, this.element.children[0]);
+	resizor.addEventListener("mousedown", function(event){
+		var intercept = document.querySelector(".intercept"),
+		resizor = document.querySelector(".resize");
+		parent.element.removeChild(intercept);
+		parent.element.removeChild(resizor);
+		parent.startSize = {x:parent.element.offsetWidth, y:parent.element.offsetHeight};
+		parent.startMouse = {x:event.clientX, y:event.clientY};
+		//add listeners
+		document.addEventListener("mousemove", parent.onMouseResizeMove);
+		document.addEventListener("mouseup", parent.onMouseResizeUp);
+		document.lastClicked = parent;
+	});
+
+}
+configWidget.prototype.setSize = function(event){
+	var newWidth = (document.lastClicked.startSize.x + (event.clientX - document.lastClicked.startMouse.x)) + "px",
+	newHeight = (document.lastClicked.startSize.y + (event.clientY - document.lastClicked.startMouse.y)) + "px";
+	
+	document.lastClicked.element.style["width"] = newWidth;
+	document.lastClicked.element.style["min-width"] = newWidth;
+	document.lastClicked.element.style["max-width"] = newWidth;
+	document.lastClicked.element.style["height"] = newHeight;
+	document.lastClicked.element.style["min-height"] = newHeight;
+	document.lastClicked.element.style["max-height"] = newHeight;
+	document.lastClicked.settings.style = {
+		'width':newWidth,
+		'min-width':newWidth,
+		'max-width':newWidth,
+		'height':newHeight,
+		'min-height':newHeight,
+		'max-height':newHeight
+	}
+	document.lastClicked.saveSettings();
+}
+configWidget.prototype.onMouseResizeMove = function(event){
+	event.preventDefault();
+	document.lastClicked.setSize(event);
+}
+configWidget.prototype.onMouseResizeUp = function(){
+	document.removeEventListener("mousemove", document.lastClicked.onMouseResizeMove);
+	document.removeEventListener("mouseup", document.lastClicked.onMouseResizeUp);
+}
+configWidget.prototype.relocate = function(){
+	console.log("relocate");
 }
 
 //input/output widget
@@ -691,23 +701,6 @@ sliderWidget.prototype.initialize = function() {
 		configurable: false 
     });
 };
-sliderWidget.prototype.start = function(){
-	widget.prototype.start.call(this);
-	if(this.properties.orientation == "pane"){
-		this.setHeight();
-		//bind it to resize
-		this.element.onresize = function(){console.log("Resize")};
-	}
-}
-sliderWidget.prototype.setHeight = function(val){
-	if(val != undefined){
-		this.element.style.height = val + "px";
-		this.element.style["min-height"] = val + "px";
-	} else {
-		this.element.style.height = this.element.offsetWidth + "px";
-		this.element.style["min-height"] = this.element.offsetWidth + "px";
-	}
-}
 sliderWidget.prototype.getHorizontal = function() {
 	if(this.indicatorRef == undefined){return;}
 	var x = this.indicatorRef.style.left; 
@@ -919,7 +912,6 @@ swatchWidget.prototype.constructor = swatchWidget;
 //TODO: move more functionality into configWidget
 //TODO: move known types to inherited versions
 //TODO: add support for object in/out for value (using parameter names directly)
-//TODO: write output widget first and add style:order attribute to control its position in flow
 //TODO: hide/show output/slider?
 function multiSliderWidget(element) {
 	widget.call(this, element);
@@ -1025,6 +1017,7 @@ multiSliderWidget.prototype.configureSelf = function(){
 	//creates the inner html based on our settings
 	this.getSettings();
 	this.loadSettings();
+	configWidget.prototype.configureSelf.call(this);
 	this.getValues();
 	var parent = this, members = [], pIndex = 0, upperLimits = [];
 	//add the sliders
@@ -1064,8 +1057,9 @@ multiSliderWidget.prototype.configureSelf = function(){
 		members.push(thisMember);
 	});
 	//add our outputs
-	if(parent.properties.parameters){
-		var outputMember = {className:"widget", members:[]};
+	if(parent.properties.parameters && parent.properties.showOutput){
+		var outputMember = {className:"widget", members:[], attributes:{}};
+		if(parent.properties.outputFirst){outputMember.attributes.style = "order:0"}
 		switch(this.properties.orientation){
 			case "horizontal":
 				outputMember.properties = {orientation:"vertical"};
@@ -1084,46 +1078,49 @@ multiSliderWidget.prototype.configureSelf = function(){
 	widget.prototype.initialize.call(this);
 	Application.initializeClasses(parent.element.children);
 	//hook up output to sliders and sliders to output
-	pIndex = 0, output = parent.element.children[parent.element.children.length-1], outputs = output.querySelectorAll("input");
-	parent.properties.configuration.forEach(function(value, index){
-		var thisSlider = parent.element.children[index].data,
-		thisOutput = outputs[pIndex].data;
-		if(value == "pane"){
-			var thisOtherOutput = outputs[++pIndex].data;
-			thisSlider.onUpdate = function(){
-				thisOutput.value = this.value.x;
-				thisOtherOutput.value = this.value.y;
-				var parent = this.element.parentNode;
-				parent && parent.data && parent.data.onUpdate();
+	if(parent.properties && parent.properties.showOutput){
+		pIndex = 0, output = parent.element.children[parent.element.children.length-1], outputs = output.querySelectorAll("input");
+		parent.properties.configuration.forEach(function(value, index){
+			var thisSlider = parent.element.children[index].data,
+			thisOutput = outputs[pIndex].data;
+			if(value == "pane"){
+				var thisOtherOutput = outputs[++pIndex].data;
+				thisSlider.onUpdate = function(){
+					thisOutput.value = this.value.x;
+					thisOtherOutput.value = this.value.y;
+					var parent = this.element.parentNode;
+					parent && parent.data && parent.data.onUpdate();
+				}
+				thisOutput.onUpdate = function(){
+					thisSlider.value = {x:this.value, y:thisSlider.value.y};
+					var parent = this.parentNode;
+					parent && parent.data && parent.data.onUpdate();
+				}
+				thisOtherOutput.onUpdate = function(){
+					thisSlider.value = {x:thisSlider.value.x, y:this.value};
+					var parent = this.parentNode;
+					parent && parent.data && parent.data.onUpdate();
+				}
+				thisSlider.start();
+			} else {
+				thisSlider.onUpdate = function(){
+					thisOutput.value = this.value;
+					var parent = this.element.parentNode;
+					parent && parent.data && parent.data.onUpdate();
+				};
+				thisOutput.onUpdate = function(){
+					thisSlider.value = this.value;
+					var parent = this.parentNode;
+					parent && parent.data && parent.data.onUpdate();
+				};
 			}
-			thisOutput.onUpdate = function(){
-				thisSlider.value = {x:this.value, y:thisSlider.value.y};
-				var parent = this.parentNode;
-				parent && parent.data && parent.data.onUpdate();
-			}
-			thisOtherOutput.onUpdate = function(){
-				thisSlider.value = {x:thisSlider.value.x, y:this.value};
-				var parent = this.parentNode;
-				parent && parent.data && parent.data.onUpdate();
-			}
-			thisSlider.start();
-		} else {
-			thisSlider.onUpdate = function(){
-				thisOutput.value = this.value;
-				var parent = this.element.parentNode;
-				parent && parent.data && parent.data.onUpdate();
-			};
-			thisOutput.onUpdate = function(){
-				thisSlider.value = this.value;
-				var parent = this.parentNode;
-				parent && parent.data && parent.data.onUpdate();
-			};
-		}
-		pIndex++;
-	});
+			pIndex++;
+		});
+	}
 	parent.setValues();
 }
 multiSliderWidget.prototype.getContextOptions = function(target){
+	if(target.data == undefined){return [];}
 	var options = [],
 	index = Array.prototype.indexOf.call(this.element.children, target),
 	next = (this.properties.orientation == "horizontal")?"right":"down",
@@ -1145,8 +1142,6 @@ multiSliderWidget.prototype.getContextOptions = function(target){
 				}
 				options.push({name: "Invert Axis", operator:function(){parent.invert(index); parent.closeContextMenu(event);}});
 			}
-			
-		default:
 			if(options.length>1){options.push("break");}
 			if(index > 0) {
 				options.push({name: "Move "+previous, operator:function(){parent.move(index, -1); parent.closeContextMenu(event);}});
@@ -1154,10 +1149,18 @@ multiSliderWidget.prototype.getContextOptions = function(target){
 			if(index < this.properties.configuration.length-1){
 				options.push({name: "Move "+next, operator:function(){parent.move(index, 1); parent.closeContextMenu(event);}});
 			}
-			options.push("break");
-			options.push({name: "Rotate", operator:function(){parent.rotate(); parent.closeContextMenu(event);}});
+			break;
+		case "widget":
+			options.push({name:(target.style.order == "")?"Move "+previous:"Move "+next, operator:function(){parent.toggleOrder();parent.closeContextMenu(event);}});
 			break;
 	}
+	options.push("break");
+	if(parent.name){options.push(parent.name)};
+	options.push({name: "Rotate", operator:function(){parent.rotate(); parent.closeContextMenu(event);}});
+	options.push({name: (parent.properties.showOutput)?"Hide Output":"Show Output", operator:function(){parent.toggleOutput();parent.closeContextMenu(event);}});
+	//get base options
+	options.push("break");
+	options = options.concat(configWidget.prototype.getContextOptions.call(parent, parent));
 	return options;
 }
 multiSliderWidget.prototype.configToArray = function(){
@@ -1189,6 +1192,11 @@ multiSliderWidget.prototype.move = function(index, direction){
 	var totalConfig = this.configToArray();
 	totalConfig[index] = totalConfig.splice(index+direction, 1, totalConfig[index])[0];
 	this.arrayToConfig(totalConfig);
+	this.configureSelf();
+	this.saveSettings();
+}
+multiSliderWidget.prototype.toggleOrder = function(){
+	this.settings.outputFirst = !this.settings.outputFirst;
 	this.configureSelf();
 	this.saveSettings();
 }
@@ -1240,6 +1248,11 @@ multiSliderWidget.prototype.rotate = function(){
 	this.configureSelf();
 	this.saveSettings();
 }
+multiSliderWidget.prototype.toggleOutput = function(){
+	this.settings.showOutput = !this.settings.showOutput;
+	this.configureSelf();
+	this.saveSettings();
+}
 
 //some saved configurations of a multiSliderWidget
 function rgbWidget(element){
@@ -1249,12 +1262,20 @@ function rgbWidget(element){
 		configuration:["horizontal", "horizontal", "horizontal"],
 		orientation:"vertical"
 	}
-	this.properties.color = new PXL();
+	//this.properties.color = new PXL();
+	this.properties.Resizeable = true;
 }
 rgbWidget.prototype = new multiSliderWidget();
 rgbWidget.prototype.constructor = rgbWidget;
+rgbWidget.prototype.initialize = function(){
+	multiSliderWidget.prototype.initialize.call(this);
+	this.properties.color = new PXL();
+}
 rgbWidget.prototype.onUpdate = function(){
-	//console.log("rgb widget update");
+	this.properties.color.red = this.value[this.properties.parameters.indexOf("red")];
+	this.properties.color.green = this.value[this.properties.parameters.indexOf("green")];
+	this.properties.color.blue = this.value[this.properties.parameters.indexOf("blue")];
+	multiSliderWidget.prototype.onUpdate.call(this);
 }
 
 function hsvWidget(element){
@@ -1263,10 +1284,15 @@ function hsvWidget(element){
 		parameters:["hue", "saturation", "value"],
 		configuration:["vertical", "pane"]
 	}
-	this.properties.color = new PXL();
+	//this.properties.color = new PXL();
+	this.properties.Resizeable = true;
 }
 hsvWidget.prototype = new multiSliderWidget();
 hsvWidget.prototype.constructor = hsvWidget;
+hsvWidget.prototype.initialize = function(){
+	multiSliderWidget.prototype.initialize.call(this);
+	this.properties.color = new PXL();
+}
 hsvWidget.prototype.onUpdate = function(){
 	var satSlider = this.element.querySelector(".type-saturation");
 	if(satSlider != null){
@@ -1287,6 +1313,13 @@ hsvWidget.prototype.onUpdate = function(){
 		hue = this.properties.color.HSVtoRGB(hue, 1, 1);
 		satvalSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
 	}
+	var RGB = this.properties.color.HSVtoRGB(this.value[this.properties.parameters.indexOf("hue")],
+		this.value[this.properties.parameters.indexOf("saturation")]/100, 
+		(100-this.value[this.properties.parameters.indexOf("value")])/100);
+	this.properties.color.red = RGB[0];
+	this.properties.color.green = RGB[1];
+	this.properties.color.blue = RGB[2];
+	multiSliderWidget.prototype.onUpdate.call(this);
 }
 
 function hslWidget(element){
@@ -1295,10 +1328,14 @@ function hslWidget(element){
 		parameters:["hue", "saturation", "lightness"],
 		configuration:["pane", "vertical"]
 	};
-	this.properties.color = new PXL();
+	this.properties.Resizeable = true;
 }
 hslWidget.prototype = new multiSliderWidget();
 hslWidget.prototype.constructor = hslWidget;
+hslWidget.prototype.initialize = function(){
+	multiSliderWidget.prototype.initialize.call(this);
+	this.properties.color = new PXL();
+}
 hslWidget.prototype.onUpdate = function(){
 	var satSlider = this.element.querySelector(".type-saturation");
 	if(satSlider != null){
@@ -1319,6 +1356,7 @@ hslWidget.prototype.onUpdate = function(){
 		hue = this.properties.color.HSVtoRGB(hue, 1, 1);
 		satlightSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
 	}
+	multiSliderWidget.prototype.onUpdate.call(this);
 }
 
 //color picker
@@ -1326,19 +1364,72 @@ function colorPickerWidget (element) {
 	configWidget.call(this, element);
 	this.members = [
 	    { className:"hsvWidget", name:"hsv"},
-	    { className:"rgbWidget", name:"rgb"}
+	    { className:"rgbWidget", name:"rgb"},
+		{ className:"swatchWidget", name:"color"}
 	    ];
 	this.properties = {
 		orientation:"horizontal",
+		Resizeable: true,
+		Relocatable: true,
 		parameters:[]
 	};
 }
 colorPickerWidget.prototype = new configWidget();
 colorPickerWidget.prototype.constructor = colorPickerWidget;
 colorPickerWidget.prototype.getContextOptions = function(target){
-	debugger;
-	return [];
+	//get the config widget we're pointed at
+	var thisConfigWidget = target,
+	options = [];
+	//put in an escape here
+	while(!(thisConfigWidget.data instanceof configWidget)){
+		thisConfigWidget = thisConfigWidget.parentNode;
+	}
+	options = thisConfigWidget.data.getContextOptions(target);
+	options.push("break");
+	options.push("Color Picker");
+	options = options.concat(configWidget.prototype.getContextOptions.call(this, this));
+	var parent = this;
+	options.push({name:"Rotate",operator:function(e){
+		//debugger;
+		parent.settings.orientation = (parent.properties.orientation == "vertical")?"horizontal":"vertical";
+		//swap width and height
+		var newWidth = parent.settings.style.height, newHeight = parent.settings.style.width;
+		parent.settings.style = {
+			'width':newWidth,
+			'min-width':newWidth,
+			'max-width':newWidth,
+			'height':newHeight,
+			'min-height':newHeight,
+			'max-height':newHeight
+		};
+		for(var thisStyle in parent.settings.style){
+			parent.element.style[thisStyle] = parent.settings.style[thisStyle];
+		}
+		parent.configureSelf();
+		parent.saveSettings();
+		parent.closeContextMenu(e);
+	}});
+	return options;
+}
+colorPickerWidget.prototype.configureSelf = function(){
+	//get our settings and set our classes appropriately
+	this.getSettings();
+	this.loadSettings();
+	widget.prototype.initialize.call(this);
+	Application.initializeClasses(parent.element.children);
+}
+colorPickerWidget.prototype.initialize = function(){
+	configWidget.prototype.initialize.call(this);
 }
 colorPickerWidget.prototype.onUpdate = function(){
-	console.log("blah");
+	//debugger;
+	//use document.lastClicked to find out which one was updated
+	var newColor = document.lastClicked.parentNode.data.properties.color;
+	this.color.style.background = "rgb("+newColor.red+","+newColor.green+","+newColor.blue+")";
+	if(document.lastClicked.parentNode.data instanceof hsvWidget){
+		this.rgb.data.value = [newColor.red, newColor.green, newColor.blue];
+		//debugger;
+	}
+	//debugger;
+	//console.log("blah");
 }
