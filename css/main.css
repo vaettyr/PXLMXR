@@ -293,6 +293,9 @@ label:after
 .colorPickerWidget
 {
 	display:inline-flex !important;
+	background:rgb(100,100,100);
+	border-radius:0.5em;
+	padding: 0.5em;
 }
 .colorPickerWidget.orientation-vertical > .rgbWidget,
 .colorPickerWidget.orientation-vertical > .hsvWidget,

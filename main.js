@@ -122,7 +122,31 @@ PXL.prototype.HSVtoRGB = function(h,s,v){
 	color = [Math.round(255*(color[0]+m)), Math.round(255*(color[1]+m)), Math.round(255*(color[2]+m))];
 	return color;	
 }
-
+//TODO: problem with red/blue wraparound
+PXL.prototype.RGBtoHSV = function(r,g,b){
+	if(r == undefined){
+		r = this.red/255;
+		g = this.green/255;
+		b = this.blue/255;
+	}
+	var M = Math.max(r,g,b),
+	m = Math.min(r,g,b),
+	C = M - m;
+	var h = 0;
+	if(C>0){
+		if(r>=g&&r>=b){
+			h = Math.floor(((g-b)/C)*60);
+		} else if (g>=r&&g>=b) {
+			h = Math.floor((((b-r)/C)+2)*60);
+		} else {
+			h = Math.floor((((r-g)/C)+4)*60);
+		}
+	}
+	if(h<0){h = 300 + Math.abs(h);}
+	var v = M,
+	s = (C>0)?C/v:0;
+	return [h, s, v];
+}
 //NOTE: think about dithering and bit depth
 function PXLmap (){
 	this.pxls = [];
@@ -450,10 +474,12 @@ configWidget.prototype.onContextMenu = function(event){
 		var contextmenu = document.createElement("div");
 		contextmenu.classList.add("contextmenu");
 		//add a display
-		var label = document.createElement("h4"), 
-		labeltext = (event.target.data.properties.type)?event.target.data.properties.type:event.target.data.constructor.name;
-		label.innerHTML = labeltext;
-		contextmenu.insertBefore(label, contextmenu.children.length);
+		if(event.target.data){
+			var label = document.createElement("h4"),
+			labeltext = (event.target.data.properties.type)?event.target.data.properties.type:event.target.data.constructor.name;
+			label.innerHTML = labeltext;
+			contextmenu.insertBefore(label, contextmenu.children.length);
+		}
 		//add the options to the menu
 		options.forEach(function(option){
 			if(option instanceof Object){
@@ -1293,7 +1319,7 @@ hsvWidget.prototype.initialize = function(){
 	multiSliderWidget.prototype.initialize.call(this);
 	this.properties.color = new PXL();
 }
-hsvWidget.prototype.onUpdate = function(){
+hsvWidget.prototype.setBackground = function(){
 	var satSlider = this.element.querySelector(".type-saturation");
 	if(satSlider != null){
 		var hue = this.value[this.properties.parameters.indexOf("hue")];
@@ -1313,6 +1339,9 @@ hsvWidget.prototype.onUpdate = function(){
 		hue = this.properties.color.HSVtoRGB(hue, 1, 1);
 		satvalSlider.style.background = "rgb("+hue[0]+","+hue[1]+","+hue[2]+")";
 	}
+}
+hsvWidget.prototype.onUpdate = function(){
+	this.setBackground();
 	var RGB = this.properties.color.HSVtoRGB(this.value[this.properties.parameters.indexOf("hue")],
 		this.value[this.properties.parameters.indexOf("saturation")]/100, 
 		(100-this.value[this.properties.parameters.indexOf("value")])/100);
@@ -1382,9 +1411,16 @@ colorPickerWidget.prototype.getContextOptions = function(target){
 	options = [];
 	//put in an escape here
 	while(!(thisConfigWidget.data instanceof configWidget)){
-		thisConfigWidget = thisConfigWidget.parentNode;
+		if(thisConfigWidget.parentNode){
+			thisConfigWidget = thisConfigWidget.parentNode;
+		} else {
+			thisConfigWidget = undefined;
+			break;
+		}
 	}
-	options = thisConfigWidget.data.getContextOptions(target);
+	if(thisConfigWidget && !(thisConfigWidget.data instanceof colorPickerWidget)){
+		options = thisConfigWidget.data.getContextOptions(target);
+	}
 	options.push("break");
 	options.push("Color Picker");
 	options = options.concat(configWidget.prototype.getContextOptions.call(this, this));
@@ -1429,6 +1465,11 @@ colorPickerWidget.prototype.onUpdate = function(){
 	if(document.lastClicked.parentNode.data instanceof hsvWidget){
 		this.rgb.data.value = [newColor.red, newColor.green, newColor.blue];
 		//debugger;
+	}
+	if(document.lastClicked.parentNode.data instanceof rgbWidget){
+		var hsv = newColor.RGBtoHSV();
+		this.hsv.data.value = [hsv[0],hsv[1]*100,100 - (hsv[2]*100)];
+		this.hsv.data.setBackground();
 	}
 	//debugger;
 	//console.log("blah");
