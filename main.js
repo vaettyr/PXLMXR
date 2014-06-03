@@ -142,7 +142,7 @@ PXL.prototype.RGBtoHSV = function(r,g,b){
 			h = Math.floor((((r-g)/C)+4)*60);
 		}
 	}
-	if(h<0){h = 300 + Math.abs(h);}
+	if(h<0){h = 360 + h;}
 	var v = M,
 	s = (C>0)?C/v:0;
 	return [h, s, v];
@@ -939,6 +939,7 @@ swatchWidget.prototype.constructor = swatchWidget;
 //TODO: move known types to inherited versions
 //TODO: add support for object in/out for value (using parameter names directly)
 //TODO: hide/show output/slider?
+//TODO: fix values:SET to point to sliders and not outputs
 function multiSliderWidget(element) {
 	widget.call(this, element);
 	this.configOn = false;
@@ -950,12 +951,18 @@ multiSliderWidget.prototype.initialize = function(){
 	configWidget.prototype.initialize.call(this);
 	Object.defineProperty(this,"value",{
 		get:function(){
-			var outputs = this.element.querySelectorAll("input"),
+			var sliders = this.element.querySelectorAll(".sliderWidget"),
 			parent = this,
 			values = [];
-			for(var thisOutput in outputs){
-				if(outputs[thisOutput].data != undefined){
-					values.push(outputs[thisOutput].data.value);
+			for(var thisSlider in sliders){
+				if(sliders[thisSlider].data){
+					var thisValue = sliders[thisSlider].data.value;
+					if(thisValue instanceof Object){
+						values.push(thisValue.x);
+						values.push(thisValue.y);
+					} else {
+						values.push(thisValue);
+					}
 				}
 			}
 			return values;
@@ -965,13 +972,19 @@ multiSliderWidget.prototype.initialize = function(){
 				var values = arguments;
 				if(arguments[0] instanceof Array){
 					values = arguments[0];
-				} 
-				outputs = this.element.querySelectorAll("input");
-				for(var index in values){
-					if(outputs[index] != undefined && outputs[index].data != undefined){
-						outputs[index].data.value = values[index];
-						outputs[index].data.onUpdate();
+				}
+				var sliders = this.element.querySelectorAll(".sliderWidget")
+				index = 0;
+				for(var thisSlider in sliders){
+					if(sliders[thisSlider].data.properties.orientation == "pane"){
+						var thisValue = {
+							x:values[index],
+							y:values[++index]
+						};
+					} else {
+						sliders[thisSlider].data.value = values[index];
 					}
+					index++;
 				}
 			}
 		}, 
