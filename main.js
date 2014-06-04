@@ -305,10 +305,13 @@ widget.prototype.initialize = function(){
 			html += "<"+tag+" data-class='"+thisMember.className+"'";
 			//add class properties
 			//we need to inherit parent properties, but nothing else
+			//FIX: don't inherit properties
+			/*
 			thisMember.properties = (thisMember.properties)?thisMember.properties:{};
 			for(var key in this.properties){
 				thisMember.properties[key] = (thisMember.properties[key])?thisMember.properties[key]:this.properties[key];
 			}
+			*/
 			for(var attribute in thisMember){
 				//write members out using JSON
 				if(attribute != "tag" && attribute != "className" && attribute != "attributes" && attribute != "settings" && attribute != "members" && thisMember[attribute]){
@@ -939,7 +942,6 @@ swatchWidget.prototype.constructor = swatchWidget;
 //TODO: move known types to inherited versions
 //TODO: add support for object in/out for value (using parameter names directly)
 //TODO: hide/show output/slider?
-//TODO: fix values:SET to point to sliders and not outputs
 function multiSliderWidget(element) {
 	widget.call(this, element);
 	this.configOn = false;
@@ -976,15 +978,18 @@ multiSliderWidget.prototype.initialize = function(){
 				var sliders = this.element.querySelectorAll(".sliderWidget")
 				index = 0;
 				for(var thisSlider in sliders){
-					if(sliders[thisSlider].data.properties.orientation == "pane"){
-						var thisValue = {
-							x:values[index],
-							y:values[++index]
-						};
-					} else {
-						sliders[thisSlider].data.value = values[index];
+					if(sliders[thisSlider].data){
+						if(sliders[thisSlider].data.properties.orientation == "pane"){
+							var thisValue = {
+								x:values[index],
+								y:values[++index]
+							};
+							sliders[thisSlider].data.value = thisValue;
+						} else {
+							sliders[thisSlider].data.value = values[index];
+						}
+						index++;
 					}
-					index++;
 				}
 			}
 		}, 
@@ -1404,11 +1409,16 @@ hslWidget.prototype.onUpdate = function(){
 //color picker
 function colorPickerWidget (element) {
 	configWidget.call(this, element);
+	/*
 	this.members = [
 	    { className:"hsvWidget", name:"hsv"},
 	    { className:"rgbWidget", name:"rgb"},
 		{ className:"swatchWidget", name:"color"}
 	    ];
+	*/
+	this.settings = {
+		parameters:[]
+	};
 	this.properties = {
 		orientation:"horizontal",
 		Resizeable: true,
@@ -1434,12 +1444,21 @@ colorPickerWidget.prototype.getContextOptions = function(target){
 	if(thisConfigWidget && !(thisConfigWidget.data instanceof colorPickerWidget)){
 		options = thisConfigWidget.data.getContextOptions(target);
 	}
+	//add move left, move right, and remove options
+	//get a list of all currently visible widgets
+	var activeWidgets = [];
+	this.properties.parameters.forEach(function(thisParameter){
+		activeWidgets.push(thisParameter.className);
+	});
+	debugger;
+	if(event.target.data && activeWidgets.indefOof(event.target.data.constructor.name)>=0){
+		debugger;
+	};
 	options.push("break");
 	options.push("Color Picker");
 	options = options.concat(configWidget.prototype.getContextOptions.call(this, this));
 	var parent = this;
 	options.push({name:"Rotate",operator:function(e){
-		//debugger;
 		parent.settings.orientation = (parent.properties.orientation == "vertical")?"horizontal":"vertical";
 		//swap width and height
 		var newWidth = parent.settings.style.height, newHeight = parent.settings.style.width;
@@ -1458,32 +1477,46 @@ colorPickerWidget.prototype.getContextOptions = function(target){
 		parent.saveSettings();
 		parent.closeContextMenu(e);
 	}});
+	options.push("break");
+	//get a list of all currently visible widgets
+
+	options.push({name:"Show RGB", operator:function(e){
+		parent.settings.parameters.push({className:"rgbWidget", name:"rgb"});
+		parent.configureSelf();
+		parent.saveSettings();
+		parent.closeContextMenu(e);
+		}
+	});
 	return options;
 }
 colorPickerWidget.prototype.configureSelf = function(){
 	//get our settings and set our classes appropriately
 	this.getSettings();
 	this.loadSettings();
+	var members = [],
+	parent = this;
+	//spawn our members accordingly
+	this.properties.parameters.forEach(function(thisParameter){
+		members.push(thisParameter);
+	});
+	members.push({className:"swatchWidget", name:"color"});
+	this.members = members;
 	widget.prototype.initialize.call(this);
 	Application.initializeClasses(parent.element.children);
 }
 colorPickerWidget.prototype.initialize = function(){
 	configWidget.prototype.initialize.call(this);
+	this.configureSelf();
 }
 colorPickerWidget.prototype.onUpdate = function(){
-	//debugger;
-	//use document.lastClicked to find out which one was updated
 	var newColor = document.lastClicked.parentNode.data.properties.color;
 	this.color.style.background = "rgb("+newColor.red+","+newColor.green+","+newColor.blue+")";
 	if(document.lastClicked.parentNode.data instanceof hsvWidget){
 		this.rgb.data.value = [newColor.red, newColor.green, newColor.blue];
-		//debugger;
 	}
 	if(document.lastClicked.parentNode.data instanceof rgbWidget){
 		var hsv = newColor.RGBtoHSV();
 		this.hsv.data.value = [hsv[0],hsv[1]*100,100 - (hsv[2]*100)];
 		this.hsv.data.setBackground();
 	}
-	//debugger;
-	//console.log("blah");
 }
