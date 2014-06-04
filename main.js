@@ -479,7 +479,7 @@ configWidget.prototype.onContextMenu = function(event){
 		//add a display
 		if(event.target.data){
 			var label = document.createElement("h4"),
-			labeltext = (event.target.data.properties.type)?event.target.data.properties.type:event.target.data.constructor.name;
+			labeltext = (event.target.data.properties && event.target.data.properties.type)?event.target.data.properties.type:event.target.data.constructor.name;
 			label.innerHTML = labeltext;
 			contextmenu.insertBefore(label, contextmenu.children.length);
 		}
@@ -951,51 +951,53 @@ multiSliderWidget.prototype = new configWidget();
 multiSliderWidget.prototype.constructor = multiSliderWidget;
 multiSliderWidget.prototype.initialize = function(){
 	configWidget.prototype.initialize.call(this);
-	Object.defineProperty(this,"value",{
-		get:function(){
-			var sliders = this.element.querySelectorAll(".sliderWidget"),
-			parent = this,
-			values = [];
-			for(var thisSlider in sliders){
-				if(sliders[thisSlider].data){
-					var thisValue = sliders[thisSlider].data.value;
-					if(thisValue instanceof Object){
-						values.push(thisValue.x);
-						values.push(thisValue.y);
-					} else {
-						values.push(thisValue);
-					}
-				}
-			}
-			return values;
-		},
-		set:function(){
-			if(arguments!= undefined){
-				var values = arguments;
-				if(arguments[0] instanceof Array){
-					values = arguments[0];
-				}
-				var sliders = this.element.querySelectorAll(".sliderWidget")
-				index = 0;
+	if(!('value' in this)){
+		Object.defineProperty(this,"value",{
+			get:function(){
+				var sliders = this.element.querySelectorAll(".sliderWidget"),
+				parent = this,
+				values = [];
 				for(var thisSlider in sliders){
 					if(sliders[thisSlider].data){
-						if(sliders[thisSlider].data.properties.orientation == "pane"){
-							var thisValue = {
-								x:values[index],
-								y:values[++index]
-							};
-							sliders[thisSlider].data.value = thisValue;
+						var thisValue = sliders[thisSlider].data.value;
+						if(thisValue instanceof Object){
+							values.push(thisValue.x);
+							values.push(thisValue.y);
 						} else {
-							sliders[thisSlider].data.value = values[index];
+							values.push(thisValue);
 						}
-						index++;
 					}
 				}
-			}
-		}, 
-		enumerable:true,
-		configuration:false
-	});
+				return values;
+			},
+			set:function(){
+				if(arguments!= undefined){
+					var values = arguments;
+					if(arguments[0] instanceof Array){
+						values = arguments[0];
+					}
+					var sliders = this.element.querySelectorAll(".sliderWidget")
+					index = 0;
+					for(var thisSlider in sliders){
+						if(sliders[thisSlider].data){
+							if(sliders[thisSlider].data.properties.orientation == "pane"){
+								var thisValue = {
+									x:values[index],
+									y:values[++index]
+								};
+								sliders[thisSlider].data.value = thisValue;
+							} else {
+								sliders[thisSlider].data.value = values[index];
+							}
+							index++;
+						}
+					}
+				}
+			}, 
+			enumerable:true,
+			configuration:false
+		});
+	}
 }
 multiSliderWidget.prototype.postInitialize = function() {
 	configWidget.prototype.postInitialize.call(this);
@@ -1322,6 +1324,7 @@ rgbWidget.prototype.onUpdate = function(){
 	multiSliderWidget.prototype.onUpdate.call(this);
 }
 
+//value is backwards
 function hsvWidget(element){
 	multiSliderWidget.call(this, element);
 	this.settings = {
@@ -1450,9 +1453,15 @@ colorPickerWidget.prototype.getContextOptions = function(target){
 	this.properties.parameters.forEach(function(thisParameter){
 		activeWidgets.push(thisParameter.className);
 	});
-	debugger;
-	if(event.target.data && activeWidgets.indefOof(event.target.data.constructor.name)>=0){
-		debugger;
+	if(activeWidgets.indexOf(thisConfigWidget.data.constructor.name)>=0){
+		options.push({name:"Remove "+thisConfigWidget.data.constructor.name, operator:function(e){
+			parent.settings.parameters.splice(activeWidgets.indexOf(thisConfigWidget.data.constructor.name),1);
+			parent.configureSelf();
+			parent.saveSettings();
+			parent.closeContextMenu(e);
+		}});
+		//move left
+		//move right
 	};
 	options.push("break");
 	options.push("Color Picker");
@@ -1479,14 +1488,33 @@ colorPickerWidget.prototype.getContextOptions = function(target){
 	}});
 	options.push("break");
 	//get a list of all currently visible widgets
-
-	options.push({name:"Show RGB", operator:function(e){
-		parent.settings.parameters.push({className:"rgbWidget", name:"rgb"});
-		parent.configureSelf();
-		parent.saveSettings();
-		parent.closeContextMenu(e);
-		}
-	});
+	if(activeWidgets.indexOf("rgbWidget")<0){
+		options.push({name:"Show RGB", operator:function(e){
+			parent.settings.parameters.push({className:"rgbWidget", name:"rgb"});
+			parent.configureSelf();
+			parent.saveSettings();
+			parent.closeContextMenu(e);
+			}
+		});
+	}
+	if(activeWidgets.indexOf("hsvWidget")<0){
+		options.push({name:"Show HSV", operator:function(e){
+			parent.settings.parameters.push({className:"hsvWidget", name:"hsv"});
+			parent.configureSelf();
+			parent.saveSettings();
+			parent.closeContextMenu(e);
+			}
+		});
+	}
+	if(activeWidgets.indexOf("hslWidget")<0){
+		options.push({name:"Show HSL", operator:function(e){
+			parent.settings.parameters.push({className:"hslWidget", name:"hsl"});
+			parent.configureSelf();
+			parent.saveSettings();
+			parent.closeContextMenu(e);
+			}
+		});
+	}
 	return options;
 }
 colorPickerWidget.prototype.configureSelf = function(){
