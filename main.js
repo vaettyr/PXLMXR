@@ -83,7 +83,7 @@ PXL.prototype.toColor = function(){
 		case "string":
 			switch(arguments[0]){
 				case "rgb":
-					output = this.red+","+this.green+","+this.blue;
+					output = "rgb("+this.red+","+this.green+","+this.blue+")";
 					break;
 			}
 			break;
@@ -932,16 +932,29 @@ ioSliderWidget.prototype.onUpdate = function(){
 //TODO: rename to colorWidget. Can be inherited from for palette swatches, etc
 //color swatch widget
 //TODO: add color utilities
+//TODO: inherit from config widget for resize functionality
 function swatchWidget(element) {
-	widget.call(this, element);
+	configWidget.call(this, element);
+	this.configOn = false;//?
+	this.properties = {
+		Resizeable:true
+	};
 }
-swatchWidget.prototype = new widget();
+swatchWidget.prototype = new configWidget();
 swatchWidget.prototype.constructor = swatchWidget;
+swatchWidget.prototype.initialize = function(){
+
+}
+swatchWidget.prototype.configureSelf = function(){
+	configWidget.prototype.configureSelf.call(this);
+	
+}
+
 
 //TODO: move more functionality into configWidget
 //TODO: move known types to inherited versions
 //TODO: add support for object in/out for value (using parameter names directly)
-//TODO: hide/show output/slider?
+//TODO: update slider indicator positions on configure self
 function multiSliderWidget(element) {
 	widget.call(this, element);
 	this.configOn = false;
@@ -1013,7 +1026,6 @@ multiSliderWidget.prototype.knownTypes = {
 	green:{upperLimit:255,output:"int"},
 	blue:{upperLimit:255,output:"int"}
 };
-//change this from an array output to a typed object output
 multiSliderWidget.prototype.getValues = function(){
 	if(this.values == undefined){
 		this.values = [], parent = this,
@@ -1029,7 +1041,7 @@ multiSliderWidget.prototype.getValues = function(){
 		});
 	} else {
 		var sliders = this.element.querySelectorAll("[data-class=sliderWidget]"), parent = this;
-		if(sliders != null && sliders[0].data != undefined){
+		if(sliders.length > 0 && sliders[0].data != undefined){
 			this.values = [];
 			for(var index in sliders){
 				var slider = sliders[index];
@@ -1046,7 +1058,6 @@ multiSliderWidget.prototype.getValues = function(){
 		}
 	}
 }
-//change this to support array and typed object input
 multiSliderWidget.prototype.setValues = function(){
 	if(this.values == undefined){this.getValues();}
 	var thisOutput = this.element.querySelectorAll("input");
@@ -1057,10 +1068,8 @@ multiSliderWidget.prototype.setValues = function(){
 		}
 	}
 }
-//move some functionality to configWidget
+//move some functionality to configWidget (?)
 multiSliderWidget.prototype.configureSelf = function(){
-	//settings are: parameters, configuration, orientation, and axis inversions
-	//creates the inner html based on our settings
 	this.getSettings();
 	this.loadSettings();
 	configWidget.prototype.configureSelf.call(this);
@@ -1166,15 +1175,14 @@ multiSliderWidget.prototype.configureSelf = function(){
 	parent.setValues();
 }
 multiSliderWidget.prototype.getContextOptions = function(target){
-	if(target.data == undefined){return [];}
 	var options = [],
 	index = Array.prototype.indexOf.call(this.element.children, target),
 	next = (this.properties.orientation == "horizontal")?"right":"down",
 	previous = (this.properties.orientation == "horizontal")?"left":"up",
 	parent = this;
-	switch(target.data.constructor.name){
+	switch(target.constructor.name){
 		case "sliderWidget":
-			if(target.data.properties.orientation == "pane"){
+			if(target.properties.orientation == "pane"){
 				options.push({name:"Split X & Y axes", operator:function(){parent.split(index); parent.closeContextMenu(event);}});
 				options.push({name:"Swap X & Y axes", operator:function(){parent.swap(index); parent.closeContextMenu(event);}});
 				options.push({name:"Invert X axis", operator:function(){parent.invert(index, "x"); parent.closeContextMenu(event);}});
@@ -1196,8 +1204,11 @@ multiSliderWidget.prototype.getContextOptions = function(target){
 				options.push({name: "Move "+next, operator:function(){parent.move(index, 1); parent.closeContextMenu(event);}});
 			}
 			break;
+		case "ioWidget":
+			options.push({name:(target.element.parentNode.style.order == "")?"Move "+previous:"Move "+next, operator:function(){parent.toggleOrder();parent.closeContextMenu(event);}});
+			break;
 		case "widget":
-			options.push({name:(target.style.order == "")?"Move "+previous:"Move "+next, operator:function(){parent.toggleOrder();parent.closeContextMenu(event);}});
+			options.push({name:(target.element.style.order == "")?"Move "+previous:"Move "+next, operator:function(){parent.toggleOrder();parent.closeContextMenu(event);}});
 			break;
 	}
 	options.push("break");
@@ -1301,6 +1312,7 @@ multiSliderWidget.prototype.toggleOutput = function(){
 }
 
 //some saved configurations of a multiSliderWidget
+//update the numbers as sliders are manipulated from outside the widget
 function rgbWidget(element){
 	multiSliderWidget.call(this, element);
 	this.settings = {
@@ -1323,7 +1335,6 @@ rgbWidget.prototype.onUpdate = function(){
 	this.properties.color.blue = this.value[this.properties.parameters.indexOf("blue")];
 	multiSliderWidget.prototype.onUpdate.call(this);
 }
-
 //value is backwards
 function hsvWidget(element){
 	multiSliderWidget.call(this, element);
@@ -1370,6 +1381,10 @@ hsvWidget.prototype.onUpdate = function(){
 	this.properties.color.green = RGB[1];
 	this.properties.color.blue = RGB[2];
 	multiSliderWidget.prototype.onUpdate.call(this);
+}
+hsvWidget.prototype.configureSelf = function(){
+	multiSliderWidget.prototype.configureSelf.call(this);
+	this.setBackground();
 }
 
 function hslWidget(element){
@@ -1445,29 +1460,70 @@ colorPickerWidget.prototype.getContextOptions = function(target){
 		}
 	}
 	if(thisConfigWidget && !(thisConfigWidget.data instanceof colorPickerWidget)){
-		options = thisConfigWidget.data.getContextOptions(target);
+		options = thisConfigWidget.data.getContextOptions(thisConfigWidget.data);
 	}
-	//add move left, move right, and remove options
 	//get a list of all currently visible widgets
 	var activeWidgets = [];
 	this.properties.parameters.forEach(function(thisParameter){
 		activeWidgets.push(thisParameter.className);
 	});
 	if(activeWidgets.indexOf(thisConfigWidget.data.constructor.name)>=0){
+		var index = activeWidgets.indexOf(thisConfigWidget.data.constructor.name);
 		options.push({name:"Remove "+thisConfigWidget.data.constructor.name, operator:function(e){
-			parent.settings.parameters.splice(activeWidgets.indexOf(thisConfigWidget.data.constructor.name),1);
+			parent.settings.parameters.splice(index,1);
 			parent.configureSelf();
 			parent.saveSettings();
 			parent.closeContextMenu(e);
 		}});
-		//move left
+		//move previous
+		if(index > 0){
+			options.push({name:"Move left", operator: function(e){
+				parent.settings.parameters[index] = parent.settings.parameters.splice(index-1, 1, parent.settings.parameters[index])[0];
+				parent.configureSelf();
+				parent.saveSettings();
+				parent.closeContextMenu(e);
+			}});
+		}
 		//move right
+		if(index < this.properties.parameters.length-1){
+			options.push({name:"Move right", operator: function(e){
+				parent.settings.parameters[index] = parent.settings.parameters.splice(index+1, 1, parent.settings.parameters[index])[0];
+				parent.configureSelf();
+				parent.saveSettings();
+				parent.closeContextMenu(e);
+			}});
+		}
 	};
+	//swatch widget options
+	if(target.data instanceof swatchWidget){
+		if(!this.properties.swatchFirst){
+			options.push({
+				name:"Move Left",
+				operator:function(e){
+					parent.settings.swatchFirst = true;
+					parent.configureSelf();
+					parent.saveSettings();
+					parent.closeContextMenu(e);
+				}
+			});
+		} else {
+			options.push({
+				name:"Move Right",
+				operator:function(e){
+					parent.settings.swatchFirst = false;
+					parent.configureSelf();
+					parent.saveSettings();
+					parent.closeContextMenu(e);
+				}
+			});
+		}
+	}
 	options.push("break");
 	options.push("Color Picker");
 	options = options.concat(configWidget.prototype.getContextOptions.call(this, this));
 	var parent = this;
 	options.push({name:"Rotate",operator:function(e){
+		parent.getValues();
 		parent.settings.orientation = (parent.properties.orientation == "vertical")?"horizontal":"vertical";
 		//swap width and height
 		var newWidth = parent.settings.style.height, newHeight = parent.settings.style.width;
@@ -1479,9 +1535,6 @@ colorPickerWidget.prototype.getContextOptions = function(target){
 			'min-height':newHeight,
 			'max-height':newHeight
 		};
-		for(var thisStyle in parent.settings.style){
-			parent.element.style[thisStyle] = parent.settings.style[thisStyle];
-		}
 		parent.configureSelf();
 		parent.saveSettings();
 		parent.closeContextMenu(e);
@@ -1517,28 +1570,49 @@ colorPickerWidget.prototype.getContextOptions = function(target){
 	}
 	return options;
 }
+colorPickerWidget.prototype.getValues = function(){
+	var values = {}, parent = this;
+	for(var thisParam in this.properties.parameters){
+		var child = parent.properties.parameters[thisParam].name,
+		value = parent[child].data.value;
+		values[child] = value;
+	}
+	this.values = values;
+}
 colorPickerWidget.prototype.configureSelf = function(){
 	//get our settings and set our classes appropriately
 	this.getSettings();
 	this.loadSettings();
+	configWidget.prototype.configureSelf.call(this);
 	var members = [],
 	parent = this;
 	//spawn our members accordingly
 	this.properties.parameters.forEach(function(thisParameter){
+		if(parent.values && parent.values[thisParameter.name]){
+			thisParameter.values = parent.values[thisParameter.name];
+		}
 		members.push(thisParameter);
 	});
-	members.push({className:"swatchWidget", name:"color"});
+	if(!this.properties.swatchFirst){
+		members.push({className:"swatchWidget", name:"color"});
+	} else {
+		members.unshift({className:"swatchWidget", name:"color"});
+	}
 	this.members = members;
 	widget.prototype.initialize.call(this);
 	Application.initializeClasses(parent.element.children);
+	this.setSwatchColor();
 }
 colorPickerWidget.prototype.initialize = function(){
 	configWidget.prototype.initialize.call(this);
+	this.properties.color = new PXL();
 	this.configureSelf();
 }
 colorPickerWidget.prototype.onUpdate = function(){
 	var newColor = document.lastClicked.parentNode.data.properties.color;
-	this.color.style.background = "rgb("+newColor.red+","+newColor.green+","+newColor.blue+")";
+	this.properties.color = newColor;
+	//this.color.style.background = "rgb("+newColor.red+","+newColor.green+","+newColor.blue+")";
+	/*
 	if(document.lastClicked.parentNode.data instanceof hsvWidget){
 		this.rgb.data.value = [newColor.red, newColor.green, newColor.blue];
 	}
@@ -1547,4 +1621,9 @@ colorPickerWidget.prototype.onUpdate = function(){
 		this.hsv.data.value = [hsv[0],hsv[1]*100,100 - (hsv[2]*100)];
 		this.hsv.data.setBackground();
 	}
+	*/
+	this.setSwatchColor();
+}
+colorPickerWidget.prototype.setSwatchColor = function(){
+	this.color.style.background = this.properties.color.toColor("rgb");
 }
