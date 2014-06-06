@@ -943,7 +943,8 @@ function swatchWidget(element) {
 swatchWidget.prototype = new configWidget();
 swatchWidget.prototype.constructor = swatchWidget;
 swatchWidget.prototype.initialize = function(){
-
+	configWidget.prototype.initialize.call(this);
+	this.properties.color = new PXL();
 }
 swatchWidget.prototype.configureSelf = function(){
 	configWidget.prototype.configureSelf.call(this);
