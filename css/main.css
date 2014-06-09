@@ -60,7 +60,7 @@ label:after
 }
 .intercept
 {
-	position:absolute;
+	position:fixed;
 	top:0;
 	left:0;
 	right:0;
@@ -69,6 +69,13 @@ label:after
 	background:rgba(50, 120, 150, 0.2);
 }
 .resize
+{
+	position:absolute;
+	bottom:0;
+	right:0;
+	z-index:10000;
+}
+.relocate
 {
 	position:absolute;
 	bottom:0;
@@ -187,7 +194,7 @@ label:after
 }
 .sliderWidget.type-saturation-value:after
 {
-	background:-webkit-linear-gradient(top, rgba(0,0,0,0), rgba(0,0,0,1)),-webkit-linear-gradient(left,rgba(255,255,255,1),rgba(255,255,255,0));
+	background:-webkit-linear-gradient(top, rgba(0,0,0,1), rgba(0,0,0,0)),-webkit-linear-gradient(left,rgba(255,255,255,1),rgba(255,255,255,0));
 }
 .sliderWidget.type-value-saturation
 {
@@ -195,7 +202,7 @@ label:after
 }
 .sliderWidget.type-value-saturation:after
 {
-	background:-webkit-linear-gradient(left, rgba(0,0,0,0), rgba(0,0,0,1));
+	background:-webkit-linear-gradient(left, rgba(0,0,0,1), rgba(0,0,0,0));
 }
 .sliderWidget.type-red-green
 {

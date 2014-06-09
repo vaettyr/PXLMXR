@@ -4,6 +4,8 @@
 		<!--<script src='jquery/jquery-2.1.0.min.js'></script>-->
 		<link rel="stylesheet" type="text/css" href="css/main.css">
 		<script type="text/javascript" src='main.js' ></script>
+		<script type="text/javascript" src='color_tools.js'></script>
+		<script type="text/javascript" src='canvas_tools.js'></script>
 		<script type="text/javascript">	 
 		/***********************************************
 		* Disable Text Selection script- ?? Dynamic Drive DHTML code library (www.dynamicdrive.com)
@@ -26,9 +28,12 @@
 	<body>
 		<h1>
 			PXLMXR
-		</h1>	
+		</h1>
+		<img src="Pixelart-tv-iso.png">
+		<canvas data-class="canvasWidget"></canvas>
 		<div data-class="colorPickerWidget"></div>
 		<button onclick="localStorage.clear()">Clear Local Storage</button>
+		<button onclick="drawImage()">Draw Image</button>
 		<!--
 		<div data-class="hsvWidget"></div>
 		<div data-class="rgbWidget"></div>
@@ -51,6 +56,16 @@
 		-->
 		<script type="text/javascript">
 				disableSelection(document.body); //Disable text selection on entire body
+				function drawImage(){
+					//var img = new Image();
+					//img.src = 'Pixelart-tv-iso.png';
+					var img = document.querySelector("img");
+					var ctx = document.querySelector("canvas").getContext("2d");
+					ctx.imageSmoothingEnabled = false;
+					ctx.webkitImageSmoothingEnabled = false;
+					ctx.mozImageSmoothingEnabled = false;
+					ctx.drawImage(img, 0, 0, 256, 256);
+				}
 				Application.initialize();
 		</script>
 	</body>
