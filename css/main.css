@@ -27,7 +27,11 @@ label:after
 {
 	content:":";
 }
-
+.containerWidget
+{
+	display:inline-block;
+	background:black;
+}
 .contextmenu
 {
 	position:fixed;

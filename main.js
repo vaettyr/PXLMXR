@@ -73,7 +73,7 @@ function PXL (){
 }
 PXL.prototype.setValue = function(val) {
 	var outValue = val;
-	if(val >= 0 && val <=1 && val.indexOf(".")>-1){ outValue = Math.floor(val * 255);}
+	if(val >= 0 && val <=1 && val.toString().indexOf(".")>-1){ outValue = Math.floor(val * 255);}
 	outValue = Math.max(0,Math.min(255,Math.floor(outValue)));
 	return outValue;
 }
@@ -174,23 +174,31 @@ function PXLmap (){
 			}
 		}
 	}
-	this.toImageData = function(){
-		if(this.canvas == undefined){
-			this.canvas = document.createElement("canvas").getContext("2d");
-		}
-		var thisImageData = this.canvas.createImageData(this.width,this.height),
-		thisData = [];
-		for(var i = 0; i < this.pxls.length; i++){
-			thisData.push(this.pxls[i].red);
-			thisData.push(this.pxls[i].green);
-			thisData.push(this.pxls[i].blue);
-			thisData.push(this.pxls[i].alpha);
-		}
-		thisImageData.data.set(thisData);
-		return thisImageData;
+}
+PXLmap.prototype.toImageData = function(){
+	if(this.canvas == undefined){
+		this.canvas = document.createElement("canvas").getContext("2d");
+	}
+	var thisImageData = this.canvas.createImageData(this.width,this.height),
+	thisData = [];
+	for(var i = 0; i < this.pxls.length; i++){
+		thisData.push(this.pxls[i].red);
+		thisData.push(this.pxls[i].green);
+		thisData.push(this.pxls[i].blue);
+		thisData.push(this.pxls[i].alpha);
+	}
+	thisImageData.data.set(thisData);
+	return thisImageData;
+}
+PXLmap.prototype.getPXL = function(x,y){
+	alert("get PXL");
+}
+PXLmap.prototype.setPXL = function(x,y,pxl){
+	if(x <= this.width-1 && y <= this.height-1){
+		var index = (y * this.width) + x;
+		this.pxls[index] = pxl;
 	}
 }
-
 //initialization sequence is as follows:
 //initialize (set variables, no children spawned yet)
 //postinitialize (immediate children spawned, siblings may not be active)
@@ -440,7 +448,7 @@ configWidget.prototype.initialize = function(){
 	// push settings to properties
 	this.loadSettings();
 	this.element.setAttribute("data-properties", JSON.stringify(this.properties));
-	if(this.properties.style){
+	if(this.properties && this.properties.style){
 		for(var thisStyle in this.properties.style){
 			this.element.style[thisStyle] = this.properties.style[thisStyle];
 		}
